@@ -13,8 +13,9 @@ plugins {
     // Apply the application plugin to add support for building an application
     id 'application'
 
-    // Plugin for using jflex
+    // Plugin for using jflex and CUP
     id "org.xbib.gradle.plugin.jflex" version "1.2.0"
+    id "cup.gradle.cup-gradle-plugin" version "1.2"
 }
 
 repositories {
