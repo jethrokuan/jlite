@@ -1,3 +1,5 @@
+package jlite.parser;
+
 import java_cup.runtime.*;
 import java.util.*;
 import java.io.*;
@@ -24,7 +26,16 @@ parser code {:
     }
 :};
 
+terminal IF, ELSE, CLASS, WHILE, READLN, PRINTLN, RETURN, THIS, NEW, MAIN, VOID, INT, BOOL, STRING;
+
+terminal Integer INTEGER_LITERAL;
+terminal String STRING_LITERAL;
+terminal String IDENTIFIER;
+terminal String CLASSNAME;
 terminal TRUE, FALSE;
+terminal NULL;
+terminal PLUS, MINUS, MULT, DIV, LT, GT, LEQ, GEQ, EQ, NEQ, NOT, OR, AND, ASSIGN;
+terminal LPAREN, RPAREN, LBRACE, RBRACE, SEMI, DOT, COMMA;
 
 non terminal Expr bool_expr;
 non terminal Main program;
@@ -37,4 +48,5 @@ bool_expr ::= TRUE {:RESULT = "false"; :}
 program ::= bool_expr:e {:
   System.out.println(e);
 :}
-  ;
+;
+ 
