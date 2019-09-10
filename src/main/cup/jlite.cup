@@ -1,5 +1,6 @@
 package jlite.parser;
 
+import jlite.ast;
 import java_cup.runtime.*;
 import java.util.*;
 import java.io.*;
@@ -26,27 +27,185 @@ parser code {:
     }
 :};
 
-terminal IF, ELSE, CLASS, WHILE, READLN, PRINTLN, RETURN, THIS, NEW, MAIN, VOID, INT, BOOL, STRING;
+terminal IF, ELSE, CLASS, WHILE, READLN, PRINTLN, RETURN, THIS, NEW, MAIN, VOID, INT, BOOL, STRING, UMINUS;
 
 terminal Integer INTEGER_LITERAL;
 terminal String STRING_LITERAL;
 terminal String IDENTIFIER;
-terminal String CLASSNAME;
+terminal String CNAME;
 terminal TRUE, FALSE;
 terminal NULL;
 terminal PLUS, MINUS, MULT, DIV, LT, GT, LEQ, GEQ, EQ, NEQ, NOT, OR, AND, ASSIGN;
 terminal LPAREN, RPAREN, LBRACE, RBRACE, SEMI, DOT, COMMA;
 
-non terminal Expr bool_expr;
-non terminal Main program;
+non terminal Ast.Prog program;
+non terminal Ast.Main mainclass;
+non terminal Ast.Clas classdecl;
+non terminal Ast.VarDecl vardecl;
+non terminal List<Ast.VarDecl> vardecllst, vardecllst_opt;
+non terminal Ast.MdDecl mddecl;
+non terminal Ast.MethodBody mdbody;
+non terminal Ast.Typ type;
+non terminal Ast.Stmt stmt;
+non terminal List<Ast.Stmt> stmtlst, stmtlst_opt;
+non terminal Ast.Exp exp, bexp, aexp, conj, rexp, bgrd, atom;
+non terminal List<Ast.Exp> explist;
+non terminal Ast.BinaryOp bop;
+non terminal List<Ast.Clas> classdecllst;
+
+precedence left PLUS, MINUS;
+precedence left MULT, DIV;
+precedence left UMINUS;
 
 start with program;
 
-bool_expr ::= TRUE {:RESULT = "false"; :}
-| FALSE {:RESULT = "false"; :}
+program ::= mainclass:x classdecllst:xs
+  {: xs.add(0, x); RESULT = new Ast.Prog(xs) :}
   ;
-program ::= bool_expr:e {:
-  System.out.println(e);
-:}
-;
- 
+  
+mainclass ::=
+  CLASS CNAME:c LBRACE VOID MAIN LPAREN LPAREN vardecllst:f RPAREN mdbody:m RBRACE
+  {: :}
+  ;
+
+classdecllst ::=
+  classdecl:c
+    {: ArrayList<Ast.Clas> arr = new ArrayList<Ast.Clas>(); arr.add(c); RESULT = arr :}
+  | classdecl:c classdecllst:c1
+    {: c1.add(0, c); RESULT = c1 :}
+  ;
+
+classdecl ::=
+  CLASS CNAME:c LBRACE vardecllst:vl mddecl:ml RBRACE
+  {: :}
+  ;
+
+vardecllst_opt ::=
+  vardecllst:vl {: :}
+  | {: :}
+  ;
+
+vardecllst ::=
+  vardecl:v {: :}
+  | vardecllst:vl vardecl:v {: :}
+  ;
+
+vardecl ::=
+  type:t IDENTIFIER:id SEMI
+  {: :}
+  ;
+
+mddecl ::=
+  type:t IDENTIFIER:id LPAREN vardecllst_opt:f RPAREN mdbody:m
+  {: :}
+  ;
+
+type ::=
+  INT {: :}
+  | BOOL {: :}
+  | STRING {: :}
+  | VOID {: :}
+  | CNAME:c {: :}
+  ;
+
+mdbody ::=
+  LBRACE vardecllst:vl stmt:s stmtlst:xs RBRACE
+  {: :}
+  ;
+
+stmt ::=
+  IF LPAREN exp:e RPAREN LBRACE stmtlst:sl RBRACE ELSE LBRACE stmtlst:esl RBRACE
+  {: :}
+  | WHILE LPAREN exp:e RPAREN LBRACE stmtlst_opt:sl RBRACE
+  {: :}
+  | READLN LPAREN IDENTIFIER:id RPAREN SEMI
+  {: :}
+  | PRINTLN LPAREN IDENTIFIER:id RPAREN SEMI
+  {: :}
+  | IDENTIFIER:id ASSIGN exp:e SEMI
+  {: :}
+  | atom:a DOT IDENTIFIER:id ASSIGN exp:e SEMI
+  {: :}
+  | atom:a LPAREN explist:el RPAREN SEMI
+  {: :}
+  | RETURN exp:e SEMI
+  {: :}
+  | RETURN SEMI
+  {: :}
+  ;
+
+stmtlst ::=
+  stmt:s {: :}
+  | stmtlst:sl stmt:s {: :}
+  ;
+
+stmtlst_opt ::=
+  stmtlst:sl {: :}
+  | {: :}
+  ;
+
+exp ::=
+  | bexp:e OR conj:c {: :}
+  | conj:c AND rexp:e {: :}
+  | aexp:e1 bop:o aexp:e2 {: :}
+  | NOT bgrd:b {: :}
+  | TRUE {: :}
+  | FALSE {: :}
+  | STRING_LITERAL {: :}
+  | atom:a {: :}
+  ;
+
+bexp ::=
+  bexp:e OR conj:c {: :}
+  | conj:c {: :}
+  ;
+
+conj ::=
+  conj:c AND rexp:e {: :}
+  | rexp:e {: :}
+  ;
+
+rexp ::=
+  aexp:e1 bop:o aexp:e2 {: :}
+  | bgrd {: :}
+  ;
+
+bop ::=
+  LT {: :}
+  | GT {: :}
+  | LEQ {: :}
+  | GEQ {: :}
+  | EQ {: :}
+  | NEQ {: :}
+  ;
+
+bgrd ::=
+  NOT bgrd:b {: :}
+  | TRUE {: :}
+  | FALSE {: :}
+  | atom:a {: :}
+  ;
+
+aexp ::=
+  aexp:e PLUS aexp:e {: :}
+  | aexp:e MINUS aexp:e {: :}
+  | aexp:e MULT aexp:e {: :}
+  | aexp:e DIV aexp:e {: :}
+  | MINUS aexp:e {: :} %prec UMINUS
+  | INTEGER_LITERAL {: :}
+  ;
+
+atom ::=
+  atom:a DOT IDENTIFIER:id {: :}
+  | atom:a LPAREN explist:el RPAREN {: :}
+  | THIS {: :}
+  | IDENTIFIER:id {: :}
+  | NEW CNAME:c LPAREN RPAREN {: :}
+  | LPAREN exp:e RPAREN {: :}
+  | NULL {: :}
+  ;
+
+explist ::=
+  exp:e {: :}
+  | explist:el COMMA exp:e {: :}
+  ;
