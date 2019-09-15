@@ -26,9 +26,17 @@ dependencies {
     // This dependency is found on compile classpath of this component and consumers.
     implementation 'com.google.guava:guava:27.0.1-jre'
 
+    // We use GSON to convert java classes to string
+    implementation 'com.google.code.gson:gson:2.8.5'
+
     // Use JUnit test framework
     testImplementation 'junit:junit:4.12'
 }
 
 // Define the main class for the application
 mainClassName = 'jlite.App'
+
+task lex(type: JavaExec) {
+  classpath = sourceSets.main.runtimeClasspath
+  main = "jlite.lexer.Scanner"
+}

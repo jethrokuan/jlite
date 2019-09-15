@@ -3,12 +3,32 @@
  */
 package jlite;
 
-public class App {
-    public String getGreeting() {
-        return "Hello world.";
-    }
+import jlite.lexer.Scanner;
+import jlite.parser.parser;
+import jlite.parser.Ast;
+import java.io.*;
 
-    public static void main(String[] args) {
-        System.out.println(new App().getGreeting());
+public class App {
+    public static void main(String[] argv) {
+        for (int i = 0; i < argv.length; i++) {
+            Scanner scanner = null;
+            try {
+                System.out.printf("%s", argv[i]);
+                scanner = new Scanner(new FileReader(argv[i]));
+            }
+            catch (FileNotFoundException e) {
+                System.out.println("File not found : \""+argv[i]+"\"");
+            }
+
+            try {
+                parser p = new parser(scanner);
+                Ast.Prog prog;
+                prog = (Ast.Prog) p.parse().value;
+                System.out.println(prog.toJSON());
+            }
+            catch (Exception e) {
+                System.out.println(e);
+            }
+        }
     }
 }
