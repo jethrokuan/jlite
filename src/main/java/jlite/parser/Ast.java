@@ -1,5 +1,7 @@
 package jlite.parser;
 
+import jlite.lexer.Scanner;
+import java.io.*;
 import java.util.*;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -78,7 +80,7 @@ public class Ast {
     }
 
     public static abstract class Stmt {
-         StmtTyp typ;
+        StmtTyp typ;
     };
 
     public static class IfStmt extends Stmt {
@@ -278,7 +280,7 @@ public class Ast {
         }
     }
 
-public static class NewExpr extends Expr {
+    public static class NewExpr extends Expr {
         public final String cname;
 
         public NewExpr(String cname) {
@@ -320,6 +322,20 @@ public static class NewExpr extends Expr {
             this.args = Collections.unmodifiableList(new ArrayList<>(args));
             this.vars = Collections.unmodifiableList(new ArrayList<>(vars));
             this.stmts = Collections.unmodifiableList(new ArrayList<>(stmts));
+        }
+    }
+
+    public static void main(String[] argv) {
+        for (int i = 0; i < argv.length; i++) {
+            String fileLoc = argv[i];
+
+            try {
+                Ast.Prog prog = parser.parse(fileLoc);
+                System.out.println(prog.toJSON());
+            }
+            catch (Exception e) {
+                System.out.println(e);
+            }
         }
     }
 }

@@ -13,7 +13,6 @@ public class App {
         for (int i = 0; i < argv.length; i++) {
             Scanner scanner = null;
             try {
-                System.out.printf("%s", argv[i]);
                 scanner = new Scanner(new FileReader(argv[i]));
             }
             catch (FileNotFoundException e) {
