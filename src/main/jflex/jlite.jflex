@@ -100,7 +100,7 @@ Integer = [0-9]+
   \" { yybegin(STRING); string.setLength(0); }
 
   {Identifier} { return symbol(sym.IDENTIFIER, yytext()); }
-  {ClassName} {return symbol(sym.CLASSNAME, yytext()); }
+  {ClassName} {return symbol(sym.CNAME, yytext()); }
 }
 
 <STRING> {
