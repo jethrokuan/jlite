@@ -1,17 +1,81 @@
 package jlite.parser;
 
-import java_cup.runtime.ComplexSymbolFactory;
+import java_cup.runtime.SymbolFactory;
+import java_cup.runtime.DefaultSymbolFactory;
 import java_cup.runtime.ScannerBuffer;
 import java_cup.runtime.Symbol;
+import jlite.lexer.Scanner;
+import jlite.lexer.LexException;
 
 import java.io.*;
 import java.util.*;
+import java.util.stream.*;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 
 parser code {:
-    public parser(java_cup.runtime.Scanner lex, ComplexSymbolFactory sf) {
-        super(lex, sf);
+    private List<String> lines;
+    private String fileLoc;
+    
+    public parser(String fileLoc) throws Exception {
+        super(new Scanner(new FileReader(fileLoc)), new DefaultSymbolFactory());
+        this.fileLoc = fileLoc;
+        this.lines = Files.readAllLines(Paths.get(fileLoc));
     }
 
+    public String printError(int lineNum, int colNum, int pad) {
+       StringBuilder sb = new StringBuilder();
+       int start = Math.max(lineNum - pad, 0);
+       int end = Math.min(lineNum + pad, this.lines.size());
+
+       for (int i = start; i <= lineNum; i++) {
+           sb.append(this.lines.get(i)).append("\n");
+       }
+
+       sb.append(repeat(colNum, "~"))
+             .append("^")
+             .append("\n");
+
+       for (int i = lineNum + 1; i <= end; i++) {
+           sb.append(this.lines.get(i)).append("\n");
+       }
+
+       return sb.toString();
+    }
+
+    public String repeat(int count, String with) {
+        return new String(new char[count]).replace("\0", with);
+   }
+    
+   public static Ast.Prog parse(String fileLoc) throws Exception {
+        parser p = new parser(fileLoc);
+        try {
+            return (Ast.Prog) p.parse().value;
+        } catch (LexException e) {
+            throw e;
+        } catch (Exception e) {
+            throw e;
+        }
+    }
+    @Override
+    public void report_error(String message, Object info) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(this.fileLoc)
+          .append(":");
+        if (info instanceof Symbol) {
+           Symbol sym = (Symbol) info;
+           sb.append(sym.left)
+             .append(":")
+             .append(sym.right)
+             .append(" parse error:\n");
+           sb.append(this.printError(sym.left, sym.right, 2))
+             .append("\n");
+           
+        } else {
+          sb.append('\n');
+        }
+        System.out.println(sb.toString());
+    }
 :};
 
 // terminals

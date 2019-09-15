@@ -36,6 +36,11 @@ dependencies {
 // Define the main class for the application
 mainClassName = 'jlite.App'
 
+task ast(type: JavaExec) {
+  classpath = sourceSets.main.runtimeClasspath
+  main = "jlite.parser.Ast"
+}
+
 task lex(type: JavaExec) {
   classpath = sourceSets.main.runtimeClasspath
   main = "jlite.lexer.Scanner"
