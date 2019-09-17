@@ -198,8 +198,8 @@ public class Ast {
             indent(sb, --i);
             sb.append("}");
             if (!elseStmtList.isEmpty()) {
-                indent(sb, i++);
-                sb.append("else {\n");
+                sb.append(" else {\n");
+                i++;
                 for (Stmt s : elseStmtList) {
                     sb.append(s.print(i)).append("\n");
                 }
@@ -248,8 +248,9 @@ public class Ast {
         public String print(int i) {
             StringBuilder sb = new StringBuilder();
             indent(sb, i);
-            sb.append("readln ")
+            sb.append("readln(")
                 .append(ident)
+                .append(")")
                 .append(";");
             return sb.toString();
         }
@@ -266,8 +267,9 @@ public class Ast {
         public String print(int i) {
             StringBuilder sb = new StringBuilder();
             indent(sb, i);
-            sb.append("println ")
+            sb.append("println(")
                 .append(expr.print())
+                .append(")")
                 .append(";");
             return sb.toString();
         }
@@ -513,11 +515,13 @@ public class Ast {
         public String print(int i) {
             StringBuilder sb = new StringBuilder();
             indent(sb, i);
-            sb.append(lhs.print())
+            sb.append("(")
+                .append(lhs.print())
                 .append(" ")
                 .append(op.toString())
                 .append(" ")
-                .append(rhs.print());
+                .append(rhs.print())
+                .append(")");
             return sb.toString();
         }
     }

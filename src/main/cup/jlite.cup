@@ -26,7 +26,7 @@ parser code {:
     public String printError(int lineNum, int colNum, int pad) {
        StringBuilder sb = new StringBuilder();
        int start = Math.max(lineNum - pad, 0);
-       int end = Math.min(lineNum + pad, this.lines.size());
+       int end = Math.min(lineNum + pad + 1, this.lines.size());
 
        for (int i = start; i <= lineNum; i++) {
            sb.append(this.lines.get(i)).append("\n");
@@ -36,7 +36,7 @@ parser code {:
              .append("^")
              .append("\n");
 
-       for (int i = lineNum + 1; i <= end; i++) {
+       for (int i = lineNum + 1; i < end; i++) {
            sb.append(this.lines.get(i)).append("\n");
        }
 
