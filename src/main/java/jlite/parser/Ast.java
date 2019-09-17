@@ -7,6 +7,13 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
 public class Ast {
+    public static void indent(StringBuilder sb, int i) {
+        while (i > 0) {
+            sb.append("  ");
+            i--;
+        }
+    }
+
     public interface GsonPrintable {
         default String toJSON() {
             Gson gson = new GsonBuilder().setPrettyPrinting().create();
@@ -14,15 +21,31 @@ public class Ast {
         }
     }
 
-    public static class Prog implements GsonPrintable {
+    public interface Printable {
+        default String print() {
+            return this.print(0);
+        }
+
+        String print(int indent);
+    }
+
+    public static class Prog implements GsonPrintable, Printable {
         public final List<Clas> clasList;
 
         public Prog(List<Clas> clasList) {
             this.clasList = Collections.unmodifiableList(new ArrayList<>(clasList));
         }
+
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            for (Clas clas : clasList) {
+                sb.append(clas.print(i)).append("\n");
+            }
+            return sb.toString();
+        }
     }
 
-    public static class Clas {
+    public static class Clas implements Printable {
         public final String cname;
         public final List<VarDecl> varDeclList;
         public final List<MdDecl> mdDeclList;
@@ -32,15 +55,51 @@ public class Ast {
             this.varDeclList = Collections.unmodifiableList(new ArrayList<>(varDeclList));
             this.mdDeclList = Collections.unmodifiableList(new ArrayList<>(mdDeclList));
         }
+
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            sb.append("class ")
+                .append(cname)
+                .append(" {\n");
+
+            i++;
+
+            // Var Declarations
+            for(VarDecl v : varDeclList) {
+                sb.append(v.print(i))
+                    .append(";\n");
+            }
+
+            sb.append("\n");
+
+            // Method Declarations
+
+            for (MdDecl m : mdDeclList) {
+                sb.append(m.print(i)).append("\n");
+            }
+
+            sb.append("}\n");
+
+            return sb.toString();
+        }
     }
 
-    public static class VarDecl {
+    public static class VarDecl implements Printable {
         public final Typ type;
         public final String ident;
 
         public VarDecl(Typ type, String ident) {
             this.type = type;
             this.ident = ident;
+        }
+
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            sb.append(this.type.toString())
+                .append(" ")
+                .append(this.ident);
+            return sb.toString();
         }
     }
 
@@ -58,14 +117,45 @@ public class Ast {
             this.typ = typ;
             this.cname = cname;
         }
+
+        @Override
+        public String toString() {
+            if (this.typ == JliteTyp.CLASS) {
+                return this.cname;
+            } else {
+                return this.typ.toString();
+            }
+        }
     }
 
     public static enum JliteTyp {
-        INTEGER,
-        BOOLEAN,
-        STRING,
-        VOID,
-        CLASS
+        INTEGER {
+            public String toString() {
+                return "Int";
+            }
+        },
+        BOOLEAN {
+            public String toString() {
+                return "Bool";
+            }
+        },
+        STRING {
+            public String toString() {
+                return "String";
+            }
+        },
+        VOID {
+            public String toString() {
+                return "Void";
+            }
+        },
+        CLASS {
+            public String toString() {
+                // Should not be called
+                assert(false);
+                return "Class";
+            }
+        }
     }
 
     public static enum StmtTyp {
@@ -79,7 +169,7 @@ public class Ast {
         STMT_CALL
     }
 
-    public static abstract class Stmt {
+    public static abstract class Stmt implements Printable {
         StmtTyp typ;
     };
 
@@ -94,6 +184,30 @@ public class Ast {
             this.thenStmtList = Collections.unmodifiableList(new ArrayList<>(thenStmtList));
             this.elseStmtList = Collections.unmodifiableList(new ArrayList<>(elseStmtList));
         }
+
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb , i++);
+            sb.append("if (");
+            sb.append(cond.print());
+            sb.append(") {\n");
+            for (Stmt s : thenStmtList) {
+                sb.append(s.print(i))
+                    .append("\n");
+            }
+            indent(sb, --i);
+            sb.append("}");
+            if (!elseStmtList.isEmpty()) {
+                indent(sb, i++);
+                sb.append("else {\n");
+                for (Stmt s : elseStmtList) {
+                    sb.append(s.print(i)).append("\n");
+                }
+                indent(sb, --i);
+                sb.append("}\n");
+            }
+            return sb.toString();
+        }
     }
 
     public static class WhileStmt extends Stmt {
@@ -105,7 +219,23 @@ public class Ast {
             this.cond = cond;
             this.stmtList = Collections.unmodifiableList(new ArrayList<>(stmtList));
         }
+
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i++);
+            sb.append("while (");
+            sb.append(cond.print());
+            sb.append(") {\n");
+            for (Stmt s: stmtList) {
+                sb.append(s.print(i))
+                    .append("\n");
+            }
+            indent(sb, --i);
+            sb.append("}");
+            return sb.toString();
+        }
     }
+
 
     public static class ReadlnStmt extends Stmt {
         public final String ident;
@@ -113,6 +243,15 @@ public class Ast {
         public ReadlnStmt(String ident) {
             this.typ = StmtTyp.STMT_READLN;
             this.ident = ident;
+        }
+
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            sb.append("readln ")
+                .append(ident)
+                .append(";");
+            return sb.toString();
         }
     }
 
@@ -122,6 +261,15 @@ public class Ast {
         public PrintlnStmt(Expr expr) {
             this.typ = StmtTyp.STMT_PRINTLN;
             this.expr = expr;
+        }
+
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            sb.append("println ")
+                .append(expr.print())
+                .append(";");
+            return sb.toString();
         }
     }
 
@@ -133,6 +281,16 @@ public class Ast {
             this.typ = StmtTyp.STMT_VARASSIGN;
             this.lhs = lhs;
             this.rhs = rhs;
+        }
+
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            sb.append(lhs)
+                .append(" = ")
+                .append(rhs.print())
+                .append(";");
+            return sb.toString();
         }
     }
 
@@ -147,6 +305,18 @@ public class Ast {
             this.lhsField = lhsField;
             this.rhs = rhs;
         }
+
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            sb.append(lhsExpr.print())
+                .append(".")
+                .append(lhsField)
+                .append(" = ")
+                .append(rhs.print())
+                .append(";");
+            return sb.toString();
+        }
     }
 
     public static class ReturnStmt extends Stmt {
@@ -155,6 +325,16 @@ public class Ast {
         public ReturnStmt(Expr expr) {
             this.typ = StmtTyp.STMT_RETURN;
             this.expr = expr;
+        }
+
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            sb.append("return ")
+                .append(expr.print())
+                .append(";");
+
+            return sb.toString();
         }
     }
 
@@ -165,6 +345,23 @@ public class Ast {
         public CallStmt(Expr target, List<Expr> args) {
             this.target = target;
             this.args = Collections.unmodifiableList(new ArrayList<>(args));
+        }
+
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            sb.append(target.print())
+                .append("(");
+            StringJoiner joiner = new StringJoiner(", ");
+
+            for (Expr a : args) {
+                joiner.add(a.print());
+            }
+
+            sb.append(joiner.toString())
+                .append(");");
+
+            return sb.toString();
         }
     }
 
@@ -182,7 +379,7 @@ public class Ast {
         EXPR_NEW
     }
 
-    public static abstract class Expr {
+    public static abstract class Expr implements Printable {
         ExprTyp typ;
     };
 
@@ -193,14 +390,30 @@ public class Ast {
             this.typ = ExprTyp.EXPR_STRINGLIT;
             this.str = str;
         }
+
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            sb.append("\"")
+                .append(str)
+                .append("\"");
+            return sb.toString();
+        }
     }
 
     public static class IntLitExpr extends Expr {
         public final int val;
 
         public IntLitExpr(int val) {
-            this.typ = ExprTyp.EXPR_STRINGLIT;
+            this.typ = ExprTyp.EXPR_INTLIT;
             this.val = val;
+        }
+
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            sb.append(val);
+            return sb.toString();
         }
     }
 
@@ -211,17 +424,42 @@ public class Ast {
             this.typ = ExprTyp.EXPR_BOOLLIT;
             this.val = val;
         }
+
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            if (val) {
+                sb.append("true");
+            } else {
+                sb.append("false");
+            }
+            return sb.toString();
+        }
     }
 
     public static class NullLitExpr extends Expr {
         public NullLitExpr() {
             this.typ = ExprTyp.EXPR_NULLLIT;
         }
+
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            sb.append("null");
+            return sb.toString();
+        }
     }
 
     public static class ThisExpr extends Expr {
         public ThisExpr() {
             this.typ = ExprTyp.EXPR_THIS;
+        }
+
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            sb.append("this");
+            return sb.toString();
         }
     }
 
@@ -231,6 +469,13 @@ public class Ast {
         public IdentExpr(String ident) {
             this.typ = ExprTyp.EXPR_IDENT;
             this.ident = ident;
+        }
+
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            sb.append(ident);
+            return sb.toString();
         }
     }
 
@@ -242,6 +487,14 @@ public class Ast {
             this.typ = ExprTyp.EXPR_UNARY;
             this.op = op;
             this.expr = expr;
+        }
+
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            sb.append(op.toString())
+                .append(expr.print());
+            return sb.toString();
         }
     }
 
@@ -256,6 +509,17 @@ public class Ast {
             this.lhs = lhs;
             this.rhs = rhs;
         }
+
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            sb.append(lhs.print())
+                .append(" ")
+                .append(op.toString())
+                .append(" ")
+                .append(rhs.print());
+            return sb.toString();
+        }
     }
 
     public static class DotExpr extends Expr {
@@ -266,6 +530,15 @@ public class Ast {
             this.typ = ExprTyp.EXPR_DOT;
             this.target = target;
             this.ident = ident;
+        }
+
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            sb.append(target.print())
+                .append(".")
+                .append(ident);
+            return sb.toString();
         }
     }
 
@@ -278,6 +551,21 @@ public class Ast {
             this.target = target;
             this.args = args;
         }
+
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            sb.append(target.print())
+                .append("(");
+
+            StringJoiner joiner = new StringJoiner(", ");
+            for (Expr a : args) {
+                joiner.add(a.print());
+            }
+            sb.append(joiner.toString());
+            sb.append(")");
+            return sb.toString();
+        }
     }
 
     public static class NewExpr extends Expr {
@@ -287,29 +575,93 @@ public class Ast {
             this.typ = ExprTyp.EXPR_NEW;
             this.cname = cname;
         }
+
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            sb.append("new ")
+                .append(cname);
+            return sb.toString();
+        }
     }
 
     public static enum UnaryOp {
-        NEGATIVE,
-        NOT
+        NEGATIVE {
+            public String toString() {
+                return "-";
+            }
+        },
+        NOT {
+            public String toString() {
+                return "!";
+            }
+        }
     }
 
     public static enum BinaryOp {
-        PLUS,
-        MINUS,
-        MULT,
-        DIV,
-        LT,
-        GT,
-        GEQ,
-        EQ,
-        LEQ,
-        NEQ,
-        AND,
-        OR
+        PLUS {
+            public String toString() {
+                return "+";
+            }
+        },
+        MINUS {
+            public String toString() {
+                return "-";
+            }
+        },
+        MULT {
+            public String toString() {
+                return "*";
+            }
+        },
+        DIV {
+            public String toString() {
+                return "/";
+            }
+        },
+        LT {
+            public String toString() {
+                return "<";
+            }
+        },
+        GT {
+            public String toString() {
+                return ">";
+            }
+        },
+        GEQ {
+            public String toString() {
+                return ">=";
+            }
+        },
+        EQ {
+            public String toString() {
+                return "=";
+            }
+        },
+        LEQ {
+            public String toString() {
+                return "<=";
+            }
+        },
+        NEQ {
+            public String toString() {
+                return "!=";
+            }
+        },
+        AND {
+            public String toString() {
+                return "&&";
+            }
+        },
+        OR {
+            public String toString() {
+                return "||";
+            }
+        }
     }
 
-    public static class MdDecl {
+    public static class MdDecl implements Printable {
         public final Typ retTyp;
         public final String name;
         public final List<VarDecl> args;
@@ -322,6 +674,39 @@ public class Ast {
             this.args = Collections.unmodifiableList(new ArrayList<>(args));
             this.vars = Collections.unmodifiableList(new ArrayList<>(vars));
             this.stmts = Collections.unmodifiableList(new ArrayList<>(stmts));
+        }
+
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            sb.append(retTyp.toString())
+                .append(" ")
+                .append(name)
+                .append("(");
+            // Args
+            StringJoiner joiner = new StringJoiner(", ");
+            for (VarDecl v : args) {
+                joiner.add(v.print());
+            }
+            sb.append(joiner.toString());
+            sb.append(") {\n");
+            i++;
+
+            // vars
+            for (VarDecl v : vars) {
+                sb.append(v.print(i)).append(";\n");
+            }
+
+            // stmts
+            for (Stmt s : stmts) {
+                sb.append(s.print(i))
+                    .append("\n");
+            }
+
+            indent(sb, --i);
+            sb.append("}");
+
+            return sb.toString();
         }
     }
 

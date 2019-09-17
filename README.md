@@ -24,10 +24,18 @@ To create and print the AST:
 ./gradlew ast --args="test/pass/e.j"
 ```
 
+To print the code:
+
+```
+./gradlew run --args="test/pass/e.j"
+```
+
+## Failed Cases
+
 To see an example of a failed parse, and parse error, try:
 
 ```
-./gradlew ast --args="test/fail/fail.j"
+./gradlew run --args="test/fail/fail.j"
 ```
 
 ``` text

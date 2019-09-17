@@ -11,19 +11,10 @@ import java.io.*;
 public class App {
     public static void main(String[] argv) {
         for (int i = 0; i < argv.length; i++) {
-            Scanner scanner = null;
+            String fileLoc = argv[i];
             try {
-                scanner = new Scanner(new FileReader(argv[i]));
-            }
-            catch (FileNotFoundException e) {
-                System.out.println("File not found : \""+argv[i]+"\"");
-            }
-
-            try {
-                parser p = new parser(scanner);
-                Ast.Prog prog;
-                prog = (Ast.Prog) p.parse().value;
-                System.out.println(prog.toJSON());
+                Ast.Prog prog = parser.parse(fileLoc);
+                System.out.println(prog.print());
             }
             catch (Exception e) {
                 System.out.println(e);
