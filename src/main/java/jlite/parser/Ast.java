@@ -172,6 +172,12 @@ public class Ast {
                 assert(false);
                 return "Class";
             }
+        },
+        FUNC {
+            public String toString() {
+                assert(false);
+                return "Func";
+            }
         }
     }
 
@@ -745,11 +751,12 @@ public class Ast {
         }
     }
 
-    public static class FuncTyp {
+    public static class FuncTyp extends Typ {
         public final List<Typ> argTyp;
         public final Typ retTyp;
 
         public FuncTyp(Ast.MdDecl mdDecl) {
+            super(JliteTyp.FUNC);
             this.argTyp = new ArrayList<>();
             for (VarDecl v: mdDecl.args) {
                 this.argTyp.add(v.type);

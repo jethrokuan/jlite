@@ -1,6 +1,7 @@
 package jlite.exceptions;
 
 import java.util.ArrayList;
+import java.util.Collection;
 
 public class SemanticErrors extends Throwable {
     ArrayList<SemanticException> errors;
@@ -16,5 +17,9 @@ public class SemanticErrors extends Throwable {
         }
 
         return s.toString();
+    }
+
+    public ArrayList<SemanticException> getErrors() {
+        return this.errors;
     }
 }
