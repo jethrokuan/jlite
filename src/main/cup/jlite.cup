@@ -114,7 +114,7 @@ program ::=
 
 mainclass ::=
     CLASS CNAME:c LBRACE VOID MAIN LPAREN argdecllist_opt:arglst RPAREN LBRACE vardecllist_opt:varlst stmtlist:stmtlst RBRACE RBRACE
-    {: Ast.MdDecl meth = new Ast.MdDecl(new Ast.Typ(Ast.JliteTyp.VOID), "main", arglst, varlst, stmtlst);
+    {: Ast.MdDecl meth = new Ast.MdDecl(new Ast.VoidTyp(), "main", arglst, varlst, stmtlst);
         ArrayList<Ast.MdDecl> meths = new ArrayList<>();
         meths.add(meth);
         RESULT = new Ast.Clas(c, Collections.emptyList(), meths);
@@ -199,15 +199,15 @@ argdecllist ::=
 
 typ ::=
     INT
-    {: RESULT = new Ast.Typ(Ast.JliteTyp.INTEGER); :}
+    {: RESULT = new Ast.IntTyp(); :}
     | BOOL
-    {: RESULT = new Ast.Typ(Ast.JliteTyp.BOOLEAN); :}
+    {: RESULT = new Ast.BoolTyp(); :}
     | STRING
-    {: RESULT = new Ast.Typ(Ast.JliteTyp.STRING); :}
+    {: RESULT = new Ast.StringTyp(); :}
     | VOID
-    {: RESULT = new Ast.Typ(Ast.JliteTyp.VOID); :}
+    {: RESULT = new Ast.VoidTyp(); :}
     | CNAME:c
-    {: RESULT = new Ast.Typ(Ast.JliteTyp.CLASS, c); :}
+    {: RESULT = new Ast.ClasTyp(c); :}
     ;
 
 stmt ::=

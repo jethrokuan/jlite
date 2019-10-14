@@ -64,15 +64,15 @@ public class Ast {
         public String print(int i) {
             StringBuilder sb = new StringBuilder();
             sb.append("class ")
-                .append(cname)
-                .append(" {\n");
+                    .append(cname)
+                    .append(" {\n");
 
             i++;
 
             // Var Declarations
-            for(VarDecl v : varDeclList) {
+            for (VarDecl v : varDeclList) {
                 sb.append(v.print(i))
-                    .append(";\n");
+                        .append(";\n");
             }
 
             sb.append("\n");
@@ -102,82 +102,215 @@ public class Ast {
             StringBuilder sb = new StringBuilder();
             indent(sb, i);
             sb.append(this.type.toString())
-                .append(" ")
-                .append(this.ident);
+                    .append(" ")
+                    .append(this.ident);
             return sb.toString();
         }
     }
 
-    public static class Typ {
-        public final String cname;
-        public final JliteTyp typ;
+    public static abstract class Typ {
+        public abstract boolean isSubTypeOrEquals(Typ o);
+    }
 
-        public Typ(JliteTyp typ) {
-            this.typ = typ;
-            this.cname = null;
+    public static class BoolTyp extends Typ {
+        @Override
+        public boolean isSubTypeOrEquals(Typ o) {
+            return equals(o);
         }
 
-        public Typ(JliteTyp typ, String cname) {
-            assert(typ == JliteTyp.CLASS);
-            this.typ = typ;
-            this.cname = cname;
+        @Override
+        public int hashCode() {
+            return getClass().hashCode();
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) return true;
+            if (obj == null || getClass() != obj.getClass()) return false;
+            return true;
         }
 
         @Override
         public String toString() {
-            if (this.typ == JliteTyp.CLASS) {
-                return this.cname;
-            } else {
-                return this.typ.toString();
-            }
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o)
-                return true;
-            if (o == null || getClass() != o.getClass())
-                return false;
-            Typ casted = (Typ) o;
-            return (typ == JliteTyp.CLASS && casted.typ == JliteTyp.CLASS &&
-                    cname == casted.cname) ||
-                    (typ == casted.typ);
+            return "Bool";
         }
     }
 
-    public static enum JliteTyp {
-        INTEGER {
-            public String toString() {
-                return "Int";
+    public static class IntTyp extends Typ {
+        @Override
+        public boolean isSubTypeOrEquals(Typ o) {
+            return equals(o);
+        }
+
+        @Override
+        public int hashCode() {
+            return getClass().hashCode();
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) return true;
+            if (obj == null || getClass() != obj.getClass()) return false;
+            return true;
+        }
+
+        @Override
+        public String toString() {
+            return "Int";
+        }
+    }
+
+    public static class StringTyp extends Typ {
+        @Override
+        public boolean isSubTypeOrEquals(Typ o) {
+            return equals(o);
+        }
+
+        @Override
+        public int hashCode() {
+            return getClass().hashCode();
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) return true;
+            if (obj == null || getClass() != obj.getClass()) return false;
+            return true;
+        }
+
+        @Override
+        public String toString() {
+            return "String";
+        }
+    }
+
+    public static class VoidTyp extends Typ {
+        @Override
+        public boolean isSubTypeOrEquals(Typ o) {
+            return equals(o);
+        }
+
+        @Override
+        public int hashCode() {
+            return getClass().hashCode();
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) return true;
+            if (obj == null || getClass() != obj.getClass()) return false;
+            return true;
+        }
+
+        @Override
+        public String toString() {
+            return "Void";
+        }
+    }
+
+    public static class NullTyp extends Typ {
+        @Override
+        public boolean isSubTypeOrEquals(Typ o) {
+            return equals(o) ||
+                    o instanceof StringTyp ||
+                    o instanceof ClasTyp;
+        }
+
+        @Override
+        public int hashCode() {
+            return getClass().hashCode();
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) return true;
+            if (obj == null || getClass() != obj.getClass()) return false;
+            return true;
+        }
+
+        @Override
+        public String toString() {
+            return "Null";
+        }
+    }
+
+    public static class ClasTyp extends Typ {
+        public final String cname;
+
+        public ClasTyp(String cname) {
+            this.cname = cname;
+        }
+
+        @Override
+        public boolean isSubTypeOrEquals(Typ o) {
+            return equals(o);
+        }
+
+        @Override
+        public int hashCode() {
+            return getClass().hashCode();
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) return true;
+            if (obj == null || getClass() != obj.getClass()) return false;
+            return cname.equals(((ClasTyp) obj).cname);
+        }
+
+        @Override
+        public String toString() {
+            return cname;
+        }
+    }
+
+    public static class FuncTyp extends Typ {
+        public final List<Typ> argTyps;
+        public final Typ retTyp;
+
+        public FuncTyp(Ast.MdDecl mdDecl) {
+            this.argTyps = new ArrayList<>();
+            for (Ast.VarDecl varDecl : mdDecl.args) {
+                this.argTyps.add(varDecl.type);
             }
-        },
-        BOOLEAN {
-            public String toString() {
-                return "Bool";
+            this.retTyp = mdDecl.retTyp;
+        }
+
+        public FuncTyp(List<Typ> argTyps, Typ retTyp) {
+            this.argTyps = argTyps;
+            this.retTyp = retTyp;
+        }
+
+        @Override
+        public boolean isSubTypeOrEquals(Typ o) {
+            return equals(o);
+        }
+
+        @Override
+        public int hashCode() {
+            return getClass().hashCode();
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) return true;
+            if (obj == null || getClass() != obj.getClass()) return false;
+            return this.argTyps.equals(((FuncTyp) obj).argTyps) &&
+                    this.retTyp.equals(((FuncTyp) obj).retTyp);
+        }
+
+        @Override
+        public String toString() {
+            StringBuilder sb = new StringBuilder();
+            StringJoiner sj = new StringJoiner(",");
+            for (Typ arg : argTyps) {
+                sj.add(arg.toString());
             }
-        },
-        STRING {
-            public String toString() {
-                return "String";
-            }
-        },
-        VOID {
-            public String toString() {
-                return "Void";
-            }
-        },
-        CLASS {
-            public String toString() {
-                // Should not be called
-                assert(false);
-                return "Class";
-            }
-        },
-        FUNC {
-            public String toString() {
-                assert(false);
-                return "Func";
-            }
+            sb.append("[")
+                    .append(sj.toString())
+                    .append("]->")
+                    .append(retTyp.toString());
+            return sb.toString();
         }
     }
 
@@ -194,7 +327,9 @@ public class Ast {
 
     public static abstract class Stmt implements Printable {
         StmtTyp typ;
-    };
+    }
+
+    ;
 
     public static class IfStmt extends Stmt {
         public final Expr cond;
@@ -210,13 +345,13 @@ public class Ast {
 
         public String print(int i) {
             StringBuilder sb = new StringBuilder();
-            indent(sb , i++);
+            indent(sb, i++);
             sb.append("if (");
             sb.append(cond.print());
             sb.append(") {\n");
             for (Stmt s : thenStmtList) {
                 sb.append(s.print(i))
-                    .append("\n");
+                        .append("\n");
             }
             indent(sb, --i);
             sb.append("}");
@@ -249,9 +384,9 @@ public class Ast {
             sb.append("while (");
             sb.append(cond.print());
             sb.append(") {\n");
-            for (Stmt s: stmtList) {
+            for (Stmt s : stmtList) {
                 sb.append(s.print(i))
-                    .append("\n");
+                        .append("\n");
             }
             indent(sb, --i);
             sb.append("}");
@@ -272,9 +407,9 @@ public class Ast {
             StringBuilder sb = new StringBuilder();
             indent(sb, i);
             sb.append("readln(")
-                .append(ident)
-                .append(")")
-                .append(";");
+                    .append(ident)
+                    .append(")")
+                    .append(";");
             return sb.toString();
         }
     }
@@ -291,9 +426,9 @@ public class Ast {
             StringBuilder sb = new StringBuilder();
             indent(sb, i);
             sb.append("println(")
-                .append(expr.print())
-                .append(")")
-                .append(";");
+                    .append(expr.print())
+                    .append(")")
+                    .append(";");
             return sb.toString();
         }
     }
@@ -312,9 +447,9 @@ public class Ast {
             StringBuilder sb = new StringBuilder();
             indent(sb, i);
             sb.append(lhs)
-                .append(" = ")
-                .append(rhs.print())
-                .append(";");
+                    .append(" = ")
+                    .append(rhs.print())
+                    .append(";");
             return sb.toString();
         }
     }
@@ -335,11 +470,11 @@ public class Ast {
             StringBuilder sb = new StringBuilder();
             indent(sb, i);
             sb.append(lhsExpr.print())
-                .append(".")
-                .append(lhsField)
-                .append(" = ")
-                .append(rhs.print())
-                .append(";");
+                    .append(".")
+                    .append(lhsField)
+                    .append(" = ")
+                    .append(rhs.print())
+                    .append(";");
             return sb.toString();
         }
     }
@@ -356,8 +491,8 @@ public class Ast {
             StringBuilder sb = new StringBuilder();
             indent(sb, i);
             sb.append("return ")
-                .append(expr.print())
-                .append(";");
+                    .append(expr.print())
+                    .append(";");
 
             return sb.toString();
         }
@@ -376,7 +511,7 @@ public class Ast {
             StringBuilder sb = new StringBuilder();
             indent(sb, i);
             sb.append(target.print())
-                .append("(");
+                    .append("(");
             StringJoiner joiner = new StringJoiner(", ");
 
             for (Expr a : args) {
@@ -384,35 +519,22 @@ public class Ast {
             }
 
             sb.append(joiner.toString())
-                .append(");");
+                    .append(");");
 
             return sb.toString();
         }
     }
 
-    public static enum ExprTyp {
-        EXPR_STRINGLIT,
-        EXPR_INTLIT,
-        EXPR_BOOLLIT,
-        EXPR_NULLLIT,
-        EXPR_THIS,
-        EXPR_IDENT,
-        EXPR_UNARY,
-        EXPR_BINARY,
-        EXPR_DOT,
-        EXPR_CALL,
-        EXPR_NEW
+    public static abstract class Expr implements Printable {
+        public Ast.Typ typ; // Inferred and annotated by Static Checker
     }
 
-    public static abstract class Expr implements Printable {
-        ExprTyp typ;
-    };
+    ;
 
     public static class StringLitExpr extends Expr {
         public final String str;
 
         public StringLitExpr(String str) {
-            this.typ = ExprTyp.EXPR_STRINGLIT;
             this.str = str;
         }
 
@@ -420,8 +542,8 @@ public class Ast {
             StringBuilder sb = new StringBuilder();
             indent(sb, i);
             sb.append("\"")
-                .append(str)
-                .append("\"");
+                    .append(str)
+                    .append("\"");
             return sb.toString();
         }
     }
@@ -430,7 +552,6 @@ public class Ast {
         public final int val;
 
         public IntLitExpr(int val) {
-            this.typ = ExprTyp.EXPR_INTLIT;
             this.val = val;
         }
 
@@ -446,7 +567,6 @@ public class Ast {
         public final boolean val;
 
         public BoolLitExpr(boolean val) {
-            this.typ = ExprTyp.EXPR_BOOLLIT;
             this.val = val;
         }
 
@@ -464,7 +584,7 @@ public class Ast {
 
     public static class NullLitExpr extends Expr {
         public NullLitExpr() {
-            this.typ = ExprTyp.EXPR_NULLLIT;
+
         }
 
         public String print(int i) {
@@ -477,7 +597,7 @@ public class Ast {
 
     public static class ThisExpr extends Expr {
         public ThisExpr() {
-            this.typ = ExprTyp.EXPR_THIS;
+
         }
 
         public String print(int i) {
@@ -492,7 +612,6 @@ public class Ast {
         public final String ident;
 
         public IdentExpr(String ident) {
-            this.typ = ExprTyp.EXPR_IDENT;
             this.ident = ident;
         }
 
@@ -509,7 +628,6 @@ public class Ast {
         public final Expr expr;
 
         public UnaryExpr(UnaryOp op, Expr expr) {
-            this.typ = ExprTyp.EXPR_UNARY;
             this.op = op;
             this.expr = expr;
         }
@@ -518,7 +636,7 @@ public class Ast {
             StringBuilder sb = new StringBuilder();
             indent(sb, i);
             sb.append(op.toString())
-                .append(expr.print());
+                    .append(expr.print());
             return sb.toString();
         }
     }
@@ -529,7 +647,6 @@ public class Ast {
         public final Expr rhs;
 
         public BinaryExpr(BinaryOp op, Expr lhs, Expr rhs) {
-            this.typ = ExprTyp.EXPR_BINARY;
             this.op = op;
             this.lhs = lhs;
             this.rhs = rhs;
@@ -539,12 +656,12 @@ public class Ast {
             StringBuilder sb = new StringBuilder();
             indent(sb, i);
             sb.append("(")
-                .append(lhs.print())
-                .append(" ")
-                .append(op.toString())
-                .append(" ")
-                .append(rhs.print())
-                .append(")");
+                    .append(lhs.print())
+                    .append(" ")
+                    .append(op.toString())
+                    .append(" ")
+                    .append(rhs.print())
+                    .append(")");
             return sb.toString();
         }
     }
@@ -554,7 +671,6 @@ public class Ast {
         public final String ident;
 
         public DotExpr(Expr target, String ident) {
-            this.typ = ExprTyp.EXPR_DOT;
             this.target = target;
             this.ident = ident;
         }
@@ -563,8 +679,8 @@ public class Ast {
             StringBuilder sb = new StringBuilder();
             indent(sb, i);
             sb.append(target.print())
-                .append(".")
-                .append(ident);
+                    .append(".")
+                    .append(ident);
             return sb.toString();
         }
     }
@@ -574,7 +690,6 @@ public class Ast {
         public final List<Expr> args;
 
         public CallExpr(Expr target, List<Expr> args) {
-            this.typ = ExprTyp.EXPR_CALL;
             this.target = target;
             this.args = args;
         }
@@ -583,7 +698,7 @@ public class Ast {
             StringBuilder sb = new StringBuilder();
             indent(sb, i);
             sb.append(target.print())
-                .append("(");
+                    .append("(");
 
             StringJoiner joiner = new StringJoiner(", ");
             for (Expr a : args) {
@@ -599,7 +714,6 @@ public class Ast {
         public final String cname;
 
         public NewExpr(String cname) {
-            this.typ = ExprTyp.EXPR_NEW;
             this.cname = cname;
         }
 
@@ -607,7 +721,7 @@ public class Ast {
             StringBuilder sb = new StringBuilder();
             indent(sb, i);
             sb.append("new ")
-                .append(cname);
+                    .append(cname);
             return sb.toString();
         }
     }
@@ -663,7 +777,7 @@ public class Ast {
         },
         EQ {
             public String toString() {
-                return "=";
+                return "==";
             }
         },
         LEQ {
@@ -707,9 +821,9 @@ public class Ast {
             StringBuilder sb = new StringBuilder();
             indent(sb, i);
             sb.append(retTyp.toString())
-                .append(" ")
-                .append(name)
-                .append("(");
+                    .append(" ")
+                    .append(name)
+                    .append("(");
             // Args
             StringJoiner joiner = new StringJoiner(", ");
             for (VarDecl v : args) {
@@ -727,7 +841,7 @@ public class Ast {
             // stmts
             for (Stmt s : stmts) {
                 sb.append(s.print(i))
-                    .append("\n");
+                        .append("\n");
             }
 
             indent(sb, --i);
@@ -744,55 +858,9 @@ public class Ast {
             try {
                 Ast.Prog prog = jlite.parser.parser.parse(fileLoc);
                 System.out.println(prog.toJSON());
-            }
-            catch (Exception e) {
+            } catch (Exception e) {
                 System.out.println(e);
             }
         }
-    }
-
-    public static class FuncTyp extends Typ {
-        public final List<Typ> argTyp;
-        public final Typ retTyp;
-
-        public FuncTyp(Ast.MdDecl mdDecl) {
-            super(JliteTyp.FUNC);
-            this.argTyp = new ArrayList<>();
-            for (VarDecl v: mdDecl.args) {
-                this.argTyp.add(v.type);
-            }
-            this.retTyp = mdDecl.retTyp;
-        }
-
-        @Override
-        public String toString() {
-            StringBuilder sb = new StringBuilder();
-            StringJoiner sj = new StringJoiner(",");
-            sb.append("[");
-            for (Typ t : argTyp) {
-                sj.add(t.toString());
-            }
-            sb.append(sj.toString())
-                    .append("]")
-                    .append("->")
-                    .append(retTyp.toString());
-            return sb.toString();
-        }
-
-        @Override
-        public int hashCode() {
-            return this.toString().hashCode();
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o)
-                return true;
-            if (o == null || getClass() != o.getClass())
-                return false;
-            return argTyp.equals(((FuncTyp) o).argTyp) &&
-                    retTyp.equals(((FuncTyp) o).retTyp);
-        }
-
     }
 }

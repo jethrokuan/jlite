@@ -6,10 +6,7 @@ import jlite.exceptions.SemanticErrors;
 import jlite.exceptions.SemanticException;
 import jlite.parser.Ast;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Environment for a Jlite program.
@@ -18,17 +15,17 @@ import java.util.Set;
  */
 public class Env {
     private final Env parent;
-    private final HashSet<String> validClassNames;
+    private final HashMap<String, ClasDescriptor> classDescs;
     private final Multimap<String, Ast.Typ> store = ArrayListMultimap.create();
 
-    public Env(HashSet<String> validClassNames) {
+    public Env(HashMap<String, ClasDescriptor> classDescs) {
         this.parent = null;
-        this.validClassNames = validClassNames;
+        this.classDescs = classDescs;
     }
 
-    public Env(Env parent, HashSet<String> validClassNames) {
+    public Env(Env parent, HashMap<String, ClasDescriptor> classDescs) {
         this.parent = parent;
-        this.validClassNames = validClassNames;
+        this.classDescs = classDescs;
 
     }
 
@@ -53,11 +50,21 @@ public class Env {
         }
 
         // Add "this"
-        store.put("this", new Ast.Typ(Ast.JliteTyp.CLASS, desc.cname));
+        store.put("this", new Ast.ClasTyp(desc.cname));
     }
 
     public void put(String name, Ast.Typ typ) {
         store.put(name, typ);
+    }
+
+    public Ast.Typ get(String name) {
+        Collection<Ast.Typ> typList = store.get(name);
+        if (typList.isEmpty()) {
+            if (parent != null) return parent.get(name);
+            return null;
+        } else {
+            return typList.iterator().next();
+        }
     }
 
     public ArrayList<SemanticException> populate(Ast.MdDecl mdDecl) {
@@ -82,7 +89,7 @@ public class Env {
     }
 
     private boolean isValidType(Ast.Typ type) {
-        if (type.typ == Ast.JliteTyp.CLASS) return validClassNames.contains(type.cname);
+        if (type instanceof Ast.ClasTyp) return classDescs.containsKey(((Ast.ClasTyp) type).cname);
         return true;
     }
 
@@ -94,5 +101,9 @@ public class Env {
         sb.append("locals: ")
                 .append(store.toString());
         return sb.toString();
+    }
+
+    public boolean contains(String name) {
+        return this.get(name) != null;
     }
 }
