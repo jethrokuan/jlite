@@ -6,15 +6,32 @@ import jlite.parser.Ast;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 
 public class StaticChecker {
-    private HashMap<String, ClasDescriptor> clasDescriptors = new HashMap<>();
+    private HashSet<String> validClassNames = new HashSet<>();
+
     public void run(Ast.Prog prog) throws SemanticErrors {
-        this.init(prog);
+        this.init(prog); // May throw, if already semantically invalid
+
+        ArrayList<SemanticException> errors = new ArrayList<>();
+
+        // Proceed with type-checking
+        for (Ast.Clas clas : prog.clasList) {
+            errors.addAll(checkClass(clas));
+        }
+
+        if (!errors.isEmpty()) throw new SemanticErrors(errors);
+    }
+
+    private ArrayList<SemanticException> checkClass(Ast.Clas clas) {
+        ArrayList<SemanticException> errors = new ArrayList<>();
+        Env env = new Env();
+        return errors;
     }
 
     /**
-     * Initializes the Static Checker, by populating the hashmap of class descriptors.
+     * Augments the
      *
      * While populating, check the following:
      * 1. There are no 2 classes with the same name
@@ -30,12 +47,13 @@ public class StaticChecker {
 
         for (Ast.Clas c: prog.clasList) {
             // Check if class name already exists
-            if (clasDescriptors.containsKey(c.cname)) {
+            if (validClassNames.contains(c.cname)) {
                 errors.add(new SemanticException(String.format("Duplicate class name '%s'", c.cname)));
             }
 
             ClasDescriptor desc = new ClasDescriptor(c);
-            clasDescriptors.put(c.cname, desc);
+            c.desc = desc;
+            validClassNames.add(c.cname);
         }
 
         if (!errors.isEmpty()) {
@@ -43,8 +61,6 @@ public class StaticChecker {
         }
 
         for (Ast.Clas c : prog.clasList) {
-            ClasDescriptor desc = clasDescriptors.get(c.cname);
-
             for (Ast.VarDecl varDecl : c.varDeclList) {
                 // Check if the declaration types are valid
                 if (!isValidType(varDecl.type)) {
@@ -52,10 +68,10 @@ public class StaticChecker {
                 }
 
                 // Check if there are duplicate var declarations
-                if (desc.vars.containsKey(varDecl.ident)) {
+                if (c.desc.vars.containsKey(varDecl.ident)) {
                     errors.add(new SemanticException(String.format("Duplicate var declaration '%s'", varDecl.ident)));
                 } else {
-                    desc.vars.put(varDecl.ident, varDecl);
+                    c.desc.vars.put(varDecl.ident, varDecl);
                 }
             }
 
@@ -73,6 +89,13 @@ public class StaticChecker {
 
                     args.put(arg.ident, arg);
                 }
+
+                Ast.FuncTyp funcTyp = new Ast.FuncTyp(mdDecl);
+                if (c.desc.hasMethodSignature(mdDecl.name, funcTyp)) {
+                    errors.add(new SemanticException(String.format("Duplicate method signature '%s' for method '%s' of class '%s'", funcTyp.toString(), mdDecl.name, c.cname)));
+                } else {
+                    c.desc.addMethodSignature(mdDecl.name, funcTyp);
+                }
             }
         }
 
@@ -84,7 +107,7 @@ public class StaticChecker {
      * @return True if a base type (String etc.) or it is a class type and the program has a class with that name
      */
     private boolean isValidType(Ast.Typ type) {
-        if (type.typ == Ast.JliteTyp.CLASS) return clasDescriptors.containsKey(type.cname);
+        if (type.typ == Ast.JliteTyp.CLASS) return validClassNames.contains(type.cname);
         return true;
     }
 }

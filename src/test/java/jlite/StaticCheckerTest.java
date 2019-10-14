@@ -77,4 +77,22 @@ public class StaticCheckerTest {
             assert(semanticErrors.toString().contains("Invalid var type 'NonExistent'\n"));
         }
     }
+
+    @Test
+    public void testDuplicateMethod() {
+        Ast.Prog prog = null;
+        try {
+            prog = parser.parse("./test/staticchecker/duplicate_method.j");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        StaticChecker checker = new StaticChecker();
+
+        try {
+            checker.run(prog);
+            assert(false);
+        } catch (SemanticErrors semanticErrors) {
+            assert(semanticErrors.toString().contains("Duplicate method signature '[String]->Void' for method 'whiles' of class 'Dummy'"));
+        }
+    }
 }

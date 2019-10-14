@@ -4,10 +4,8 @@
 package jlite;
 
 import jlite.exceptions.SemanticErrors;
-import jlite.lexer.Scanner;
-import jlite.parser.parser;
 import jlite.parser.Ast;
-import java.io.*;
+import jlite.parser.parser;
 
 public class App {
     public static void main(String[] argv) {
@@ -17,7 +15,7 @@ public class App {
                 Ast.Prog prog = parser.parse(fileLoc);
                 StaticChecker checker = new StaticChecker();
                 checker.run(prog);
-                System.out.println(prog.print());
+                System.out.println(prog.toJSON());
             }
             catch (Exception | SemanticErrors e) {
                 System.out.println(e);

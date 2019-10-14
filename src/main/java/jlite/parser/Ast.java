@@ -1,10 +1,13 @@
 package jlite.parser;
 
-import jlite.lexer.Scanner;
-import java.io.*;
-import java.util.*;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import jlite.ClasDescriptor;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.StringJoiner;
 
 public class Ast {
     public static void indent(StringBuilder sb, int i) {
@@ -49,9 +52,11 @@ public class Ast {
         public final String cname;
         public final List<VarDecl> varDeclList;
         public final List<MdDecl> mdDeclList;
+        public ClasDescriptor desc; // Populated after the static checking phase
 
         public Clas(String cname, List<VarDecl> varDeclList, List<MdDecl> mdDeclList) {
             this.cname = cname;
+            this.desc = null;
             this.varDeclList = Collections.unmodifiableList(new ArrayList<>(varDeclList));
             this.mdDeclList = Collections.unmodifiableList(new ArrayList<>(mdDeclList));
         }
@@ -125,6 +130,18 @@ public class Ast {
             } else {
                 return this.typ.toString();
             }
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o)
+                return true;
+            if (o == null || getClass() != o.getClass())
+                return false;
+            Typ casted = (Typ) o;
+            return (typ == JliteTyp.CLASS && casted.typ == JliteTyp.CLASS &&
+                    cname == casted.cname) ||
+                    (typ == casted.typ);
         }
     }
 
@@ -719,12 +736,56 @@ public class Ast {
             String fileLoc = argv[i];
 
             try {
-                Ast.Prog prog = parser.parse(fileLoc);
+                Ast.Prog prog = jlite.parser.parser.parse(fileLoc);
                 System.out.println(prog.toJSON());
             }
             catch (Exception e) {
                 System.out.println(e);
             }
         }
+    }
+
+    public static class FuncTyp {
+        public final List<Typ> argTyp;
+        public final Typ retTyp;
+
+        public FuncTyp(Ast.MdDecl mdDecl) {
+            this.argTyp = new ArrayList<>();
+            for (VarDecl v: mdDecl.args) {
+                this.argTyp.add(v.type);
+            }
+            this.retTyp = mdDecl.retTyp;
+        }
+
+        @Override
+        public String toString() {
+            StringBuilder sb = new StringBuilder();
+            StringJoiner sj = new StringJoiner(",");
+            sb.append("[");
+            for (Typ t : argTyp) {
+                sj.add(t.toString());
+            }
+            sb.append(sj.toString())
+                    .append("]")
+                    .append("->")
+                    .append(retTyp.toString());
+            return sb.toString();
+        }
+
+        @Override
+        public int hashCode() {
+            return this.toString().hashCode();
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o)
+                return true;
+            if (o == null || getClass() != o.getClass())
+                return false;
+            return argTyp.equals(((FuncTyp) o).argTyp) &&
+                    retTyp.equals(((FuncTyp) o).retTyp);
+        }
+
     }
 }
