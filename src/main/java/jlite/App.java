@@ -3,6 +3,7 @@
  */
 package jlite;
 
+import jlite.exceptions.SemanticErrors;
 import jlite.lexer.Scanner;
 import jlite.parser.parser;
 import jlite.parser.Ast;
@@ -14,9 +15,11 @@ public class App {
             String fileLoc = argv[i];
             try {
                 Ast.Prog prog = parser.parse(fileLoc);
+                StaticChecker checker = new StaticChecker();
+                checker.run(prog);
                 System.out.println(prog.print());
             }
-            catch (Exception e) {
+            catch (Exception | SemanticErrors e) {
                 System.out.println(e);
             }
         }
