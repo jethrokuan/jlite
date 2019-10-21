@@ -134,10 +134,13 @@ public class StaticChecker {
                 condTyp = checkExpr(whileStmt.cond, env);
             } catch (SemanticException e) {
                 errors.add(e);
+                throw new SemanticErrors(errors);
             }
-            if (!condTyp.isSubTypeOrEquals(new Ast.BoolTyp()))
-                errors.add(new SemanticException(String.format("condition in while statement needs to be bool. Got '%s'", condTyp)));
 
+            if (!condTyp.isSubTypeOrEquals(new Ast.BoolTyp())) {
+                errors.add(new SemanticException(String.format("condition in while statement needs to be bool. Got '%s'", condTyp)));
+                throw new SemanticErrors(errors);
+            }
             Ast.Typ whileStmtTyp = null;
             try {
                 whileStmtTyp = checkStmts(whileStmt.stmtList, env);
@@ -262,7 +265,38 @@ public class StaticChecker {
 
             return new Ast.VoidTyp();
         } else if (stmt instanceof Ast.ReturnStmt) {
-            // TODO
+            Ast.ReturnStmt returnStmt = (Ast.ReturnStmt) stmt;
+            Ast.Typ retTyp = env.get("Ret");
+            assert retTyp != null;
+
+            if (retTyp instanceof Ast.VoidTyp) {
+                if (returnStmt.expr != null) {
+                    errors.add(new SemanticException("return: cannot return void type"));
+                    throw new SemanticErrors(errors);
+                }
+                return retTyp;
+            } else {
+                if (returnStmt.expr == null) {
+                    errors.add(new SemanticException("return: expr not null, but return type is null"));
+                }
+
+                Ast.Typ exprTyp = null;
+
+                try {
+                    exprTyp = checkExpr(returnStmt.expr, env);
+                } catch (SemanticException e) {
+                    errors.add(e);
+                }
+
+                if (!errors.isEmpty()) throw new SemanticErrors(errors);
+
+                if (!exprTyp.isSubTypeOrEquals(retTyp)) {
+                    errors.add(new SemanticException(String.format("return: exprTyp '%s' not subtype of retTyp '%s'", exprTyp, retTyp)));
+                    throw new SemanticErrors(errors);
+                }
+
+                return retTyp;
+            }
         } else if (stmt instanceof Ast.CallStmt) {
             // TODO
         } else {

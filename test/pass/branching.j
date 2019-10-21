@@ -3,16 +3,16 @@ class Main {
     Int i;
     
     if (i == 1) {
-       return i;
+       println("hello");
     } else {
-       return "false";
+       println("world");
     }
   }
 }
 
 class Dummy {
-  Void whiles(String c) {
-    while (!c) {
+  Void whiles(Int c) {
+    while (2 == 2) {
        c = c + 1;
     }
   }
