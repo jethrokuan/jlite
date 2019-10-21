@@ -45,13 +45,19 @@ public class StaticChecker {
             return errors;
         }
 
+        Ast.Typ lastTyp = null;
         try {
-            Ast.Typ lastTyp = checkStmts(mdDecl.stmts, env);
+            lastTyp = checkStmts(mdDecl.stmts, env);
         } catch (SemanticErrors semanticErrors) {
             errors.addAll(semanticErrors.getErrors());
+            return errors;
         } catch (Exception e) {
             e.printStackTrace();
             return errors;
+        }
+
+        if (!lastTyp.isSubTypeOrEquals(mdDecl.retTyp)) {
+            errors.add(new SemanticException(String.format("Method body type '%s' not equal to return type '%s'", lastTyp, mdDecl.retTyp)));
         }
 
         return errors;
@@ -69,11 +75,12 @@ public class StaticChecker {
             }
         }
 
-        if (lastTyp == null) {
-            errors.add(new SemanticException("Statement body cannot be empty."));
+        if (!errors.isEmpty()) {
+            throw new SemanticErrors(errors);
         }
 
-        if (!errors.isEmpty()) {
+        if (lastTyp == null) {
+            errors.add(new SemanticException("Statement body cannot be empty."));
             throw new SemanticErrors(errors);
         }
 
@@ -271,7 +278,7 @@ public class StaticChecker {
 
             if (retTyp instanceof Ast.VoidTyp) {
                 if (returnStmt.expr != null) {
-                    errors.add(new SemanticException("return: cannot return void type"));
+                    errors.add(new SemanticException(String.format("return: cannot return an expression for Void statement")));
                     throw new SemanticErrors(errors);
                 }
                 return retTyp;
@@ -298,7 +305,19 @@ public class StaticChecker {
                 return retTyp;
             }
         } else if (stmt instanceof Ast.CallStmt) {
-            // TODO
+            Ast.CallStmt callStmt = (Ast.CallStmt) stmt;
+            Ast.CallExpr callExpr = new Ast.CallExpr(callStmt.target, callStmt.args);
+
+            Ast.Typ callTyp = null;
+            try {
+                callTyp = checkExpr(callExpr, env);
+            } catch (SemanticException e) {
+                errors.add(e);
+                throw new SemanticErrors(errors);
+            }
+
+             // TODO: might need to set target somewhere
+            return callTyp;
         } else {
             throw new Exception(String.format("Typechecker did not support stmt of type '%s'", stmt.getClass().toString()));
         }
@@ -309,13 +328,16 @@ public class StaticChecker {
     private Ast.Typ checkExpr(Ast.Expr expr, Env env) throws SemanticException {
         if (expr instanceof Ast.IntLitExpr) {
             expr.typ = new Ast.IntTyp();
-            return new Ast.IntTyp();
+            return expr.typ;
         } else if (expr instanceof Ast.StringLitExpr) {
             expr.typ = new Ast.StringTyp();
+            return expr.typ;
         } else if (expr instanceof Ast.NullLitExpr) {
             expr.typ = new Ast.NullTyp();
+            return expr.typ;
         } else if (expr instanceof Ast.BoolLitExpr) {
             expr.typ = new Ast.BoolTyp();
+            return expr.typ;
         } else if (expr instanceof Ast.ThisExpr) {
             if (env.contains("this")) {
                 expr.typ = env.get("this");
@@ -420,11 +442,59 @@ public class StaticChecker {
                     throw new AssertionError("Jlite Compiler Error: should not reach here!");
             }
         } else if (expr instanceof Ast.DotExpr) {
-            // TODO
+            Ast.DotExpr dotExpr = (Ast.DotExpr) expr;
+            Ast.Typ targetTyp = checkExpr(dotExpr.target, env); // can throw
+            if (!(targetTyp instanceof Ast.ClasTyp)) {
+                throw new SemanticException(String.format("dotexpr: expected class type, got '%s'", targetTyp));
+            }
+
+            Ast.ClasTyp targetClasTyp = (Ast.ClasTyp) targetTyp;
+
+            if (!classDescs.containsKey(targetClasTyp.cname)) {
+                throw new SemanticException(String.format("dotexpr: no such class '%s'", targetClasTyp.cname));
+            }
+
+            ClasDescriptor desc = classDescs.get(targetClasTyp.cname);
+
+            if (!desc.vars.containsKey(dotExpr.ident)) {
+                throw new SemanticException(String.format("dotexpr: no such field '%s' in class '%s'", dotExpr.ident, targetClasTyp.cname));
+            }
+
+            expr.typ = desc.vars.get(dotExpr.ident).type;
+            return expr.typ;
+
         } else if (expr instanceof Ast.CallExpr) {
-            // TODO
+            Ast.CallExpr callExpr = (Ast.CallExpr) expr;
+            if (callExpr.target instanceof Ast.IdentExpr) {
+                Ast.IdentExpr identExpr = (Ast.IdentExpr) callExpr.target;
+
+                if (!env.contains(identExpr.ident)) {
+                    throw new SemanticException(String.format("callexpr: no symbol '%s'", identExpr.ident));
+                }
+
+                Ast.Typ identTyp = env.get(identExpr.ident);
+
+                if (!(identTyp instanceof Ast.FuncTyp)) {
+                    throw new SemanticException(String.format("callexpr: expected func, got '%s'", identTyp));
+                }
+            } else if (callExpr.target instanceof Ast.DotExpr) {
+                // TODO
+                Ast.DotExpr dotExpr = (Ast.DotExpr) callExpr.target;
+                if (!(dotExpr.target instanceof Ast.ClasTyp)) {
+                    // TODO
+                }
+            } else {
+                throw new SemanticException(String.format("callexpr: expecting ident or dotexpr, got '%s'", callExpr.getClass().toString()));
+            }
+
+            // TODO: process args
+
         } else if (expr instanceof Ast.NewExpr) {
-            // TODO
+            Ast.NewExpr newExpr = (Ast.NewExpr) expr;
+            if (!classDescs.containsKey(newExpr.cname))
+                throw new SemanticException(String.format("newexpr: no such class '%s'", newExpr.cname));
+            expr.typ = new Ast.ClasTyp(newExpr.cname);
+            return expr.typ;
         } else {
             throw new SemanticException(String.format("Unhandled expr type: %s", expr.getClass().toString()));
         }
