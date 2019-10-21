@@ -49,12 +49,15 @@ public class StaticChecker {
             Ast.Typ lastTyp = checkStmts(mdDecl.stmts, env);
         } catch (SemanticErrors semanticErrors) {
             errors.addAll(semanticErrors.getErrors());
+        } catch (Exception e) {
+            e.printStackTrace();
+            return errors;
         }
 
         return errors;
     }
 
-    private Ast.Typ checkStmts(List<Ast.Stmt> stmts, Env env) throws SemanticErrors {
+    private Ast.Typ checkStmts(List<Ast.Stmt> stmts, Env env) throws SemanticErrors, Exception {
         ArrayList<SemanticException> errors = new ArrayList<>();
 
         Ast.Typ lastTyp = null;
@@ -77,7 +80,7 @@ public class StaticChecker {
         return lastTyp;
     }
 
-    private Ast.Typ checkStmt(Ast.Stmt stmt, Env env) throws SemanticErrors {
+    private Ast.Typ checkStmt(Ast.Stmt stmt, Env env) throws SemanticErrors, Exception {
         ArrayList<SemanticException> errors = new ArrayList<>();
 
         if (stmt instanceof Ast.IfStmt) {
@@ -115,7 +118,7 @@ public class StaticChecker {
                 throw new SemanticErrors(errors);
             }
 
-            if (!(thenStmtTyp.equals(elseStmtTyp) || elseStmtTyp.equals(thenStmtTyp))) {
+            if (!(thenStmtTyp.isSubTypeOrEquals(elseStmtTyp) || elseStmtTyp.isSubTypeOrEquals(thenStmtTyp))) {
                 errors.add(new SemanticException(String.format("then block and else block type incompatible. then: '%s', else '%s'", thenStmtTyp, elseStmtTyp)));
             }
 
@@ -123,14 +126,149 @@ public class StaticChecker {
                 throw new SemanticErrors(errors);
             }
 
-            return thenStmtTyp.equals(elseStmtTyp) ? elseStmtTyp : thenStmtTyp;
+            return thenStmtTyp.isSubTypeOrEquals(elseStmtTyp) ? elseStmtTyp : thenStmtTyp; // Return the most general type
         } else if (stmt instanceof Ast.WhileStmt) {
-            // TODO
-        }
-        if (!errors.isEmpty()) {
-            throw new SemanticErrors(errors);
-        }
+            Ast.WhileStmt whileStmt = (Ast.WhileStmt) stmt;
+            Ast.Typ condTyp = null;
+            try {
+                condTyp = checkExpr(whileStmt.cond, env);
+            } catch (SemanticException e) {
+                errors.add(e);
+            }
+            if (!condTyp.isSubTypeOrEquals(new Ast.BoolTyp()))
+                errors.add(new SemanticException(String.format("condition in while statement needs to be bool. Got '%s'", condTyp)));
 
+            Ast.Typ whileStmtTyp = null;
+            try {
+                whileStmtTyp = checkStmts(whileStmt.stmtList, env);
+            } catch (SemanticErrors e) {
+                errors.addAll(e.getErrors());
+            }
+
+            if (!errors.isEmpty()) {
+                throw new SemanticErrors(errors);
+            }
+
+            return whileStmtTyp;
+        } else if (stmt instanceof Ast.ReadlnStmt) {
+            Ast.ReadlnStmt readlnStmt = (Ast.ReadlnStmt) stmt;
+
+            if (!env.contains(readlnStmt.ident)) {
+                errors.add(new SemanticException(String.format(String.format("Unknown symbol: '%s'", readlnStmt.ident))));
+            }
+
+            if (!errors.isEmpty()) {
+                throw new SemanticErrors(errors);
+            }
+
+            Ast.Typ identTyp = env.get(readlnStmt.ident);
+
+            ArrayList<Ast.Typ> validTypes = new ArrayList<>();
+            validTypes.add(new Ast.IntTyp());
+            validTypes.add(new Ast.StringTyp());
+            validTypes.add(new Ast.BoolTyp());
+            if (!validTypes.contains(identTyp)) {
+                errors.add(new SemanticException((String.format("ident not of type Int, String or Bool.'"))));
+            }
+            // TODO: need to assign vardecl for readln?
+            return new Ast.VoidTyp();
+        } else if (stmt instanceof  Ast.PrintlnStmt) {
+            Ast.PrintlnStmt printlnStmt = (Ast.PrintlnStmt) stmt;
+            Ast.Typ exprTyp = null;
+            try {
+                exprTyp = checkExpr(printlnStmt.expr, env);
+            } catch (SemanticException e) {
+                errors.add(e);
+            }
+
+            if (!errors.isEmpty()) throw new SemanticErrors(errors);
+
+            ArrayList<Ast.Typ> validTypes = new ArrayList<>();
+            validTypes.add(new Ast.IntTyp());
+            validTypes.add(new Ast.StringTyp());
+            validTypes.add(new Ast.BoolTyp());
+
+            if (!(validTypes.contains(exprTyp))) {
+                errors.add(new SemanticException(String.format("println statement expr of type '%s', expecting Int, String or Bool", exprTyp)));
+            }
+        } else if (stmt instanceof Ast.VarAssignStmt) {
+            Ast.VarAssignStmt varAssignStmt = (Ast.VarAssignStmt) stmt;
+            String ident = varAssignStmt.lhs;
+            Ast.Expr rhs = varAssignStmt.rhs;
+
+            if (!env.contains(ident))
+                errors.add(new SemanticException(("unknown symbol '%s'".format(ident))));
+            Ast.Typ identTyp = env.get(ident);
+
+            Ast.Typ rhsTyp = null;
+            try {
+                rhsTyp = checkExpr(rhs, env);
+            } catch (SemanticException e) {
+                errors.add(e);
+            }
+
+            if (!errors.isEmpty()) throw new SemanticErrors(errors);
+
+            if (!rhsTyp.isSubTypeOrEquals(identTyp)) {
+                errors.add(new SemanticException(String.format("varassign: rhs '%s' not subtype of ident type '%s'.", rhsTyp, identTyp)));
+            }
+            // TODO: need to get vardecl?
+
+            return new Ast.VoidTyp();
+        } else if (stmt instanceof Ast.FieldAssignStmt) {
+            Ast.FieldAssignStmt fieldAssignStmt = (Ast.FieldAssignStmt) stmt;
+            Ast.Typ lhsExprTyp = null;
+            Ast.Typ rhsExprTyp = null;
+            try {
+                lhsExprTyp = checkExpr(fieldAssignStmt.lhsExpr, env);
+                if (!(lhsExprTyp instanceof Ast.ClasTyp)) {
+                    errors.add(new SemanticException(String.format("fieldssign: lhs expr of type '%s', expecting Class")));
+                }
+            } catch (SemanticException e) {
+                errors.add(e);
+            }
+
+            if (!errors.isEmpty()) throw new SemanticErrors(errors);
+
+            String cname = ((Ast.ClasTyp) lhsExprTyp).cname;
+
+            if (!classDescs.containsKey(cname)) {
+                errors.add(new SemanticException(String.format("fieldassign: no class '%s'", cname)));
+            }
+
+            if (!errors.isEmpty()) throw new SemanticErrors(errors);
+
+            ClasDescriptor desc = classDescs.get(cname);
+
+            if (!desc.vars.containsKey(fieldAssignStmt.lhsField)) {
+                errors.add(new SemanticException(String.format(String.format("fieldassign: class '%s' does not have field '%s'.", cname, fieldAssignStmt.lhsField))));
+            }
+
+            if (!errors.isEmpty()) throw new SemanticErrors(errors);
+
+            try {
+                rhsExprTyp = checkExpr(fieldAssignStmt.rhs, env);
+            } catch (SemanticException e) {
+                errors.add(e);
+            }
+
+            if (!errors.isEmpty()) throw new SemanticErrors(errors);
+
+            if (!rhsExprTyp.isSubTypeOrEquals(lhsExprTyp)) {
+                errors.add(new SemanticException(String.format("fieldassign, rhs of type '%s' not subtype of lhs of type '%s'",rhsExprTyp, lhsExprTyp)));
+            }
+
+            if (!errors.isEmpty()) throw new SemanticErrors(errors);
+
+            return new Ast.VoidTyp();
+        } else if (stmt instanceof Ast.ReturnStmt) {
+            // TODO
+        } else if (stmt instanceof Ast.CallStmt) {
+            // TODO
+        } else {
+            throw new Exception(String.format("Typechecker did not support stmt of type '%s'", stmt.getClass().toString()));
+        }
+        assert(false);
         return new Ast.VoidTyp();
     }
 
@@ -245,8 +383,14 @@ public class StaticChecker {
                     expr.typ = new Ast.BoolTyp();
                     return expr.typ;
                 default:
-                    throw new AssertionError("BUG");
+                    throw new AssertionError("Jlite Compiler Error: should not reach here!");
             }
+        } else if (expr instanceof Ast.DotExpr) {
+            // TODO
+        } else if (expr instanceof Ast.CallExpr) {
+            // TODO
+        } else if (expr instanceof Ast.NewExpr) {
+            // TODO
         } else {
             throw new SemanticException(String.format("Unhandled expr type: %s", expr.getClass().toString()));
         }
