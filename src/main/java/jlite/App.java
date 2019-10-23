@@ -3,7 +3,7 @@
  */
 package jlite;
 
-import jlite.exceptions.SemanticErrors;
+import jlite.exceptions.SemanticException;
 import jlite.parser.Ast;
 import jlite.parser.parser;
 
@@ -17,8 +17,10 @@ public class App {
                 checker.run(prog);
                 System.out.println(prog.toJSON());
             }
-            catch (Exception | SemanticErrors e) {
+            catch (SemanticException e) {
                 System.out.println(e);
+            } catch (Exception e) {
+                e.printStackTrace();
             }
         }
     }

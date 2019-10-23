@@ -1,6 +1,6 @@
 package jlite;
 
-import jlite.exceptions.SemanticErrors;
+import jlite.exceptions.SemanticException;
 import jlite.parser.Ast;
 import jlite.parser.parser;
 import org.junit.Test;
@@ -19,80 +19,8 @@ public class StaticCheckerTest {
         try {
             checker.run(prog);
             assert(false);
-        } catch (SemanticErrors semanticErrors) {
-            assert(semanticErrors.toString().contains("Duplicate class name 'Dummy'"));
-        }
-    }
-
-    @Test
-    public void testDuplicateVars() {
-        Ast.Prog prog = null;
-        try {
-            prog = parser.parse("./test/staticchecker/duplicate_vars.j");
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        StaticChecker checker = new StaticChecker();
-
-        try {
-            checker.run(prog);
-            assert(false);
-        } catch (SemanticErrors semanticErrors) {
-            assert(semanticErrors.toString().contains("Duplicate var declaration 'i'"));
-        }
-    }
-
-    @Test
-    public void testDuplicateArgs() {
-        Ast.Prog prog = null;
-        try {
-            prog = parser.parse("./test/staticchecker/duplicate_args.j");
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        StaticChecker checker = new StaticChecker();
-
-        try {
-            checker.run(prog);
-            assert(false);
-        } catch (SemanticErrors semanticErrors) {
-            assert(semanticErrors.toString().contains("Duplicate arg name 'a' in method 'main' of class 'Main'"));
-        }
-    }
-
-    @Test
-    public void testInvalidType() {
-        Ast.Prog prog = null;
-        try {
-            prog = parser.parse("./test/staticchecker/invalid_type.j");
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        StaticChecker checker = new StaticChecker();
-
-        try {
-            checker.run(prog);
-            assert(false);
-        } catch (SemanticErrors semanticErrors) {
-            assert(semanticErrors.toString().contains("Invalid var type 'NonExistent'\n"));
-        }
-    }
-
-    @Test
-    public void testDuplicateMethod() {
-        Ast.Prog prog = null;
-        try {
-            prog = parser.parse("./test/staticchecker/duplicate_method.j");
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        StaticChecker checker = new StaticChecker();
-
-        try {
-            checker.run(prog);
-            assert(false);
-        } catch (SemanticErrors semanticErrors) {
-            assert(semanticErrors.toString().contains("Duplicate method signature '[String]->Void' for method 'whiles' of class 'Dummy'"));
+        } catch (SemanticException e) {
+            assert(e.toString().contains("Duplicate class name 'Dummy'"));
         }
     }
 }

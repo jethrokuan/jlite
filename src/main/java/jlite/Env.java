@@ -2,7 +2,6 @@ package jlite;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import jlite.exceptions.SemanticErrors;
 import jlite.exceptions.SemanticException;
 import jlite.parser.Ast;
 
@@ -15,17 +14,14 @@ import java.util.*;
  */
 public class Env {
     private final Env parent;
-    private final HashMap<String, ClasDescriptor> classDescs;
     private final Multimap<String, Ast.Typ> store = ArrayListMultimap.create();
 
-    public Env(HashMap<String, ClasDescriptor> classDescs) {
+    Env() {
         this.parent = null;
-        this.classDescs = classDescs;
     }
 
-    public Env(Env parent, HashMap<String, ClasDescriptor> classDescs) {
+    Env(Env parent) {
         this.parent = parent;
-        this.classDescs = classDescs;
 
     }
 
@@ -34,41 +30,42 @@ public class Env {
      *
      * @param desc Clas Descriptor
      */
-    public void populate(ClasDescriptor desc) {
+    void populate(ClasDescriptor desc) {
 //        Populate methods first
         for (Map.Entry<String, Set<Ast.FuncTyp>> entry : desc.methods.entrySet()) {
             String method = entry.getKey();
             for (Ast.FuncTyp t : entry.getValue()) {
-                store.put(method, t);
+                put(method, t);
             }
         }
 
         for (Map.Entry<String, Ast.VarDecl> entry : desc.vars.entrySet()) {
-            String varname = entry.getKey();
             Ast.Typ t = entry.getValue().type;
-            store.put(entry.getKey(), t);
+            put(entry.getKey(), t);
         }
 
         // Add "this"
-        store.put("this", new Ast.ClasTyp(desc.cname));
+        put("this", new Ast.ClasTyp(desc.cname));
     }
 
-    public void put(String name, Ast.Typ typ) {
+    private void put(String name, Ast.Typ typ) {
         store.put(name, typ);
     }
 
-    public Ast.Typ get(String name) {
+    Ast.Typ getOne(String name) throws SemanticException {
         Collection<Ast.Typ> typList = store.get(name);
         if (typList.isEmpty()) {
-            if (parent != null) return parent.get(name);
+            if (parent != null) return parent.getOne(name);
             return null;
         } else {
-            // TODO: check for function types
+            if (typList.size() != 1) {
+                throw new SemanticException(String.format("Environment contains more than one of '%s': '%s'", name, typList.toString()));
+            }
             return typList.iterator().next();
         }
     }
 
-    public ArrayList<SemanticException> populate(Ast.MdDecl mdDecl) {
+    ArrayList<SemanticException> populate(Ast.MdDecl mdDecl, HashMap<String, ClasDescriptor> classDescs) {
         ArrayList<SemanticException> errors = new ArrayList<>();
 
         for (Ast.VarDecl varDecl : mdDecl.args) {
@@ -79,32 +76,41 @@ public class Env {
 
         // Override vars
         for (Ast.VarDecl varDecl : mdDecl.vars) {
-            if (!isValidType(varDecl.type)) {
+            if (!isValidType(varDecl.type, classDescs)) {
                 errors.add(new SemanticException(String.format("invalid variable type '%s'", varDecl.type)));
                 continue;
             }
-            store.put(varDecl.ident, varDecl.type);
+            put(varDecl.ident, varDecl.type);
         }
 
         return errors;
     }
 
-    private boolean isValidType(Ast.Typ type) {
-        if (type instanceof Ast.ClasTyp) return classDescs.containsKey(((Ast.ClasTyp) type).cname);
-        return true;
+    private boolean isValidType(Ast.Typ type, HashMap<String, ClasDescriptor> classDescs) {
+        return !(type instanceof Ast.ClasTyp) || classDescs.containsKey(((Ast.ClasTyp) type).cname);
     }
 
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
         String parentString = parent == null ? "{}" : parent.toString();
-        sb.append("parent: " + parentString).append("\n");
+        sb.append("parent: ").append(parentString).append("\n");
         sb.append("locals: ")
                 .append(store.toString());
         return sb.toString();
     }
 
-    public boolean contains(String name) {
-        return this.get(name) != null;
+    boolean contains(String name) {
+        return !store.get(name).isEmpty();
+    }
+
+    public Collection<Ast.Typ> get(String name) {
+        Collection<Ast.Typ> typList = store.get(name);
+        if (typList.isEmpty()) {
+            if (parent != null) return parent.get(name);
+            return null;
+        } else {
+            return typList;
+        }
     }
 }
