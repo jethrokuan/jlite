@@ -63,6 +63,7 @@ public class Env {
             if (parent != null) return parent.get(name);
             return null;
         } else {
+            // TODO: check for function types
             return typList.iterator().next();
         }
     }

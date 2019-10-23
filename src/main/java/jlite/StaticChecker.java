@@ -478,16 +478,30 @@ public class StaticChecker {
                     throw new SemanticException(String.format("callexpr: expected func, got '%s'", identTyp));
                 }
             } else if (callExpr.target instanceof Ast.DotExpr) {
-                // TODO
                 Ast.DotExpr dotExpr = (Ast.DotExpr) callExpr.target;
-                if (!(dotExpr.target instanceof Ast.ClasTyp)) {
-                    // TODO
+                Ast.Typ targetTyp = checkExpr(dotExpr.target, env);
+                if (!(targetTyp instanceof Ast.ClasTyp)) {
+                    throw new SemanticException(String.format("callexpr->dotexpr: target of type '%s', expecting Class", dotExpr.target));
                 }
+                Ast.ClasTyp targetClasTyp = (Ast.ClasTyp) targetTyp;
+
+                if (!classDescs.containsKey(targetClasTyp.cname)) {
+                    throw new SemanticException(String.format("callexpr: no such class '%s'", targetClasTyp.cname));
+                }
+
+                ClasDescriptor desc = classDescs.get(targetClasTyp.cname);
+
+                // Method access
+                if (!desc.methods.containsKey(dotExpr.ident)) {
+                    throw new SemanticException(String.format("callexpr: class '%s' does not have method '%s'", targetClasTyp.cname, dotExpr.ident));
+                }
+
             } else {
                 throw new SemanticException(String.format("callexpr: expecting ident or dotexpr, got '%s'", callExpr.getClass().toString()));
             }
 
             // TODO: process args
+            // TODO: attach method somewhere?
 
         } else if (expr instanceof Ast.NewExpr) {
             Ast.NewExpr newExpr = (Ast.NewExpr) expr;

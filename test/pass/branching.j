@@ -3,7 +3,7 @@ class Main {
     Int i;
     
     if (i == 1) {
-       println("hello");
+       return ;
     } else {
        println("world");
     }

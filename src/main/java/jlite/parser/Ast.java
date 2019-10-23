@@ -329,8 +329,6 @@ public class Ast {
         StmtTyp typ;
     }
 
-    ;
-
     public static class IfStmt extends Stmt {
         public final Expr cond;
         public final List<Stmt> thenStmtList;
@@ -503,6 +501,7 @@ public class Ast {
         public final List<Expr> args;
 
         public CallStmt(Expr target, List<Expr> args) {
+            this.typ = StmtTyp.STMT_CALL;
             this.target = target;
             this.args = Collections.unmodifiableList(new ArrayList<>(args));
         }
@@ -526,7 +525,7 @@ public class Ast {
     }
 
     public static abstract class Expr implements Printable {
-        public Ast.Typ typ; // Inferred and annotated by Static Checker
+        public Ast.Typ typ; // Inferred and annotated by StaticChecker
     }
 
     ;
