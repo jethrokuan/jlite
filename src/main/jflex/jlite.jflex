@@ -1,13 +1,15 @@
 package jlite.lexer;
 
-import java_cup.runtime.*;
 import jlite.parser.sym;
+import java_cup.runtime.Symbol;
+import java_cup.runtime.ComplexSymbolFactory.ComplexSymbol;
+import java_cup.runtime.ComplexSymbolFactory;
+import java_cup.runtime.ComplexSymbolFactory.Location;
 
 %%
 %public
 %class Scanner
 %cup
-%cupdebug
 %unicode
 %line
 %column
@@ -15,11 +17,27 @@ import jlite.parser.sym;
 %{
   StringBuilder string = new StringBuilder();
 
-  private Symbol symbol(int type) {
-    return new Symbol(type, yyline, yycolumn);
+  public Scanner(java.io.Reader in, ComplexSymbolFactory sf){
+    this(in);
+	symbolFactory = sf;
   }
-  private Symbol symbol(int type, Object value) {
-    return new Symbol(type, yyline, yycolumn, value);
+
+  ComplexSymbolFactory symbolFactory = new ComplexSymbolFactory();
+
+  private Symbol symbol(String name, int sym) {
+        return symbolFactory.newSymbol(name, sym, new Location(yyline+1,yycolumn+1,yychar), new Location(yyline+1,yycolumn+yylength(),yychar+yylength()));
+  }
+
+  private Symbol symbol(String name, int sym, Object val) {
+        Location left = new Location(yyline+1,yycolumn+1,yychar);
+        Location right= new Location(yyline+1,yycolumn+yylength(), yychar+yylength());
+        return symbolFactory.newSymbol(name, sym, left, right,val);
+  }
+
+  private Symbol symbol(String name, int sym, Object val,int buflength) {
+        Location left = new Location(yyline+1,yycolumn+yylength()-buflength,yychar+yylength()-buflength);
+        Location right= new Location(yyline+1,yycolumn+yylength(), yychar+yylength());
+        return symbolFactory.newSymbol(name, sym, left, right,val);
   }
 %}
 
@@ -43,50 +61,50 @@ Integer = [0-9]+
 %%
 <YYINITIAL> {
   /* keywords */
-  "if" { return symbol(sym.IF); }
-  "else" { return symbol(sym.ELSE); }
-  "class" { return symbol(sym.CLASS); }
-  "while" { return symbol(sym.WHILE); }
-  "realdln" { return symbol(sym.READLN); }
-  "println" { return symbol(sym.PRINTLN); }
-  "return" { return symbol(sym.RETURN); }
-  "this" { return symbol(sym.THIS); }
-  "new" { return symbol(sym.NEW);}
-  "main" { return symbol(sym.MAIN); }
-  "Void" { return symbol(sym.VOID); }
-  "Int" { return symbol(sym.INT); }
-  "Bool" { return symbol(sym.BOOL); }
-  "String" { return symbol(sym.STRING); }
+  "if" { return symbol("if",sym.IF); }
+  "else" { return symbol("else",sym.ELSE); }
+  "class" { return symbol("class",sym.CLASS); }
+  "while" { return symbol("while",sym.WHILE); }
+  "realdln" { return symbol("readln",sym.READLN); }
+  "println" { return symbol("println",sym.PRINTLN); }
+  "return" { return symbol("return",sym.RETURN); }
+  "this" { return symbol("this",sym.THIS); }
+  "new" { return symbol("new",sym.NEW);}
+  "main" { return symbol("main",sym.MAIN); }
+  "Void" { return symbol("void",sym.VOID); }
+  "Int" { return symbol("int",sym.INT); }
+  "Bool" { return symbol("bool",sym.BOOL); }
+  "String" { return symbol("string",sym.STRING); }
 
   /* boolean literals */
-  "true" { return symbol(sym.TRUE); }
-  "false" { return symbol(sym.FALSE); }
-  "null" { return symbol(sym.NULL); }
+  "true" { return symbol("true",sym.TRUE); }
+  "false" { return symbol("false",sym.FALSE); }
+  "null" { return symbol("null",sym.NULL); }
 
   /* separators */
-  "(" { return symbol(sym.LPAREN); }
-  ")" { return symbol(sym.RPAREN); }
-  "{" { return symbol(sym.LBRACE); }
-  "}" { return symbol(sym.RBRACE); }
-  ";" { return symbol(sym.SEMI); }
-  "." { return symbol(sym.DOT); }
-  "," { return symbol(sym.COMMA); }
+  "(" { return symbol("(",sym.LPAREN); }
+  ")" { return symbol(")",sym.RPAREN); }
+  "{" { return symbol("{",sym.LBRACE); }
+  "}" { return symbol("}",sym.RBRACE); }
+  ";" { return symbol(";",sym.SEMI); }
+  "." { return symbol(".",sym.DOT); }
+  "," { return symbol(",",sym.COMMA); }
 
   /* operators */
-  "+" { return symbol(sym.PLUS); }
-  "-" { return symbol(sym.MINUS); }
-  "*" { return symbol(sym.MULT); }
-  "/" { return symbol(sym.DIV); }
-  "<" { return symbol(sym.LT); }
-  ">" { return symbol(sym.GT); }
-  "<=" { return symbol(sym.LEQ); }
-  ">=" { return symbol(sym.GEQ); }
-  "==" { return symbol(sym.EQ); }
-  "!=" { return symbol(sym.NEQ); }
-  "=" { return symbol(sym.ASSIGN); }
-  "!" { return symbol(sym.NOT); }
-  "||" { return symbol(sym.OR); }
-  "&&" { return symbol(sym.AND); }
+  "+" { return symbol("plus",sym.PLUS); }
+  "-" { return symbol("minus",sym.MINUS); }
+  "*" { return symbol("mult",sym.MULT); }
+  "/" { return symbol("div",sym.DIV); }
+  "<" { return symbol("lt",sym.LT); }
+  ">" { return symbol("gt",sym.GT); }
+  "<=" { return symbol("leq",sym.LEQ); }
+  ">=" { return symbol("geq",sym.GEQ); }
+  "==" { return symbol("eq",sym.EQ); }
+  "!=" { return symbol("neq",sym.NEQ); }
+  "=" { return symbol("=",sym.ASSIGN); }
+  "!" { return symbol("not",sym.NOT); }
+  "||" { return symbol("or",sym.OR); }
+  "&&" { return symbol("and",sym.AND); }
 
   /* comments */
   {Comment} { /* ignore */ }
@@ -95,15 +113,15 @@ Integer = [0-9]+
   {WhiteSpace} { /* ignore */ }
 
   /* literals */
-  {Integer} { return symbol(sym.INTEGER_LITERAL, new Integer(Integer.parseInt(yytext()))); }
+  {Integer} { return symbol("IntLit", sym.INTEGER_LITERAL, new Integer(Integer.parseInt(yytext()))); }
   \" { yybegin(STRING); string.setLength(0); }
 
-  {Identifier} { return symbol(sym.IDENTIFIER, yytext()); }
-  {ClassName} {return symbol(sym.CNAME, yytext()); }
+  {Identifier} { return symbol("Ident",sym.IDENTIFIER, yytext()); }
+  {ClassName} {return symbol("Clas", sym.CNAME, yytext()); }
 }
 
 <STRING> {
-  \" { yybegin(YYINITIAL); return symbol(sym.STRING_LITERAL, string.toString()); }
+  \" { yybegin(YYINITIAL); return symbol("StringLit", sym.STRING_LITERAL, string.toString()); }
   [^\n\r\"\\]+                   { string.append( yytext() ); }
   "\\t"                            { string.append('\t'); }
   "\\n"                            { string.append('\n'); }
@@ -122,4 +140,4 @@ Integer = [0-9]+
 
 /* error fallback */
 [^] { throw new LexException("Illegal character \"" + yytext() + "\"", yyline, yycolumn); }
-<<EOF>> {return symbol(sym.EOF); }
+<<EOF>> {return symbol("EOF",sym.EOF); }

@@ -1,7 +1,8 @@
 package jlite.parser;
 
 import java_cup.runtime.SymbolFactory;
-import java_cup.runtime.DefaultSymbolFactory;
+import java_cup.runtime.ComplexSymbolFactory;
+import java_cup.runtime.ComplexSymbolFactory.ComplexSymbol;
 import java_cup.runtime.ScannerBuffer;
 import java_cup.runtime.Symbol;
 import jlite.lexer.Scanner;
@@ -18,7 +19,7 @@ parser code {:
     private String fileLoc;
     
     public parser(String fileLoc) throws Exception {
-        super(new Scanner(new FileReader(fileLoc)), new DefaultSymbolFactory());
+        super(new Scanner(new FileReader(fileLoc)), new LocatableSymbolFactory());
         this.fileLoc = fileLoc;
         this.lines = Files.readAllLines(Paths.get(fileLoc));
     }
@@ -62,15 +63,13 @@ parser code {:
         StringBuilder sb = new StringBuilder();
         sb.append(this.fileLoc)
           .append(":");
-        if (info instanceof Symbol) {
-           Symbol sym = (Symbol) info;
-           sb.append(sym.left)
+        if (info instanceof ComplexSymbol) {
+           ComplexSymbol sym = (ComplexSymbol) info;
+           sb.append(sym.getLeft())
              .append(":")
-             .append(sym.right)
-             .append(" parse error:\n");
-           sb.append(this.printError(sym.left, sym.right, 2))
-             .append("\n");
-           
+             .append(sym.getRight())
+             .append(" parse error:\n")
+             .append(message);
         } else {
           sb.append('\n');
         }

@@ -171,7 +171,7 @@ public class StaticChecker {
 
             if (retTyp instanceof Ast.VoidTyp) {
                 if (returnStmt.expr != null) {
-                    throw new SemanticException(String.format("return: cannot return an expression for Void statement"));
+                    throw new SemanticException("return: cannot return an expression for Void statement");
                 }
                 return retTyp;
             } else {

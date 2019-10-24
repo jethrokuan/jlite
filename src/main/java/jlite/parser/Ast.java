@@ -32,7 +32,21 @@ public class Ast {
         String print(int indent);
     }
 
-    public static class Prog implements GsonPrintable, Printable {
+    public static class Location {
+        public final int line;
+        public final int col;
+
+        public Location(int line, int col) {
+            this.line = line;
+            this.col = col;
+        }
+    }
+
+    public static abstract class Locatable {
+        public Location location;
+    }
+
+    public static class Prog extends Locatable implements GsonPrintable, Printable {
         public final List<Clas> clasList;
 
         public Prog(List<Clas> clasList) {
@@ -48,7 +62,7 @@ public class Ast {
         }
     }
 
-    public static class Clas implements Printable {
+    public static class Clas extends Locatable implements Printable {
         public final String cname;
         public final List<VarDecl> varDeclList;
         public final List<MdDecl> mdDeclList;
@@ -89,7 +103,7 @@ public class Ast {
         }
     }
 
-    public static class VarDecl implements Printable {
+    public static class VarDecl extends Locatable implements Printable {
         public final Typ type;
         public final String ident;
 
@@ -108,7 +122,7 @@ public class Ast {
         }
     }
 
-    public static abstract class Typ {
+    public static abstract class Typ extends Locatable {
         public abstract boolean isSubTypeOrEquals(Typ o);
     }
 
@@ -325,7 +339,7 @@ public class Ast {
         STMT_CALL
     }
 
-    public static abstract class Stmt implements Printable {
+    public static abstract class Stmt extends Locatable implements Printable {
         StmtTyp typ;
     }
 
@@ -524,7 +538,7 @@ public class Ast {
         }
     }
 
-    public static abstract class Expr implements Printable {
+    public static abstract class Expr extends Locatable implements Printable {
         public Ast.Typ typ; // Inferred and annotated by StaticChecker
     }
 
@@ -801,7 +815,7 @@ public class Ast {
         }
     }
 
-    public static class MdDecl implements Printable {
+    public static class MdDecl extends Locatable implements Printable {
         public final Typ retTyp;
         public final String name;
         public final List<VarDecl> args;
