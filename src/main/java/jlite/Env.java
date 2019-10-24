@@ -101,7 +101,7 @@ public class Env {
     }
 
     boolean contains(String name) {
-        return !store.get(name).isEmpty();
+        return !get(name).isEmpty();
     }
 
     public Collection<Ast.Typ> get(String name) {

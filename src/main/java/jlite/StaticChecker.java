@@ -326,12 +326,6 @@ public class StaticChecker {
                     throw new SemanticException(identExpr, String.format("callexpr: no symbol '%s'", identExpr.ident));
                 }
 
-                Ast.Typ identTyp = env.getOne(identExpr.ident);
-
-                if (!(identTyp instanceof Ast.FuncTyp)) {
-                    throw new SemanticException(identExpr, String.format("callexpr: expected func, got '%s'", identTyp));
-                }
-
                 ArrayList<Ast.Typ> argTyps = new ArrayList<>();
 
                 for (Ast.Expr arg : callExpr.args) {
