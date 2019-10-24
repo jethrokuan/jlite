@@ -2,7 +2,6 @@ package jlite.parser;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import jlite.ClasDescriptor;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -66,11 +65,9 @@ public class Ast {
         public final String cname;
         public final List<VarDecl> varDeclList;
         public final List<MdDecl> mdDeclList;
-        public ClasDescriptor desc; // Populated after the static checking phase
 
         public Clas(String cname, List<VarDecl> varDeclList, List<MdDecl> mdDeclList) {
             this.cname = cname;
-            this.desc = null;
             this.varDeclList = Collections.unmodifiableList(new ArrayList<>(varDeclList));
             this.mdDeclList = Collections.unmodifiableList(new ArrayList<>(mdDeclList));
         }
@@ -123,10 +120,14 @@ public class Ast {
     }
 
     public static abstract class Typ extends Locatable {
+        String typ;
         public abstract boolean isSubTypeOrEquals(Typ o);
     }
 
     public static class BoolTyp extends Typ {
+        public BoolTyp() {
+            this.typ = "Bool";
+        }
         @Override
         public boolean isSubTypeOrEquals(Typ o) {
             return equals(o);
@@ -151,6 +152,9 @@ public class Ast {
     }
 
     public static class IntTyp extends Typ {
+        public IntTyp() {
+            this.typ = "Int";
+        }
         @Override
         public boolean isSubTypeOrEquals(Typ o) {
             return equals(o);
@@ -175,6 +179,9 @@ public class Ast {
     }
 
     public static class StringTyp extends Typ {
+        public StringTyp() {
+            this.typ = "String";
+        }
         @Override
         public boolean isSubTypeOrEquals(Typ o) {
             return equals(o);
@@ -199,6 +206,9 @@ public class Ast {
     }
 
     public static class VoidTyp extends Typ {
+        public VoidTyp() {
+            this.typ = "Void";
+        }
         @Override
         public boolean isSubTypeOrEquals(Typ o) {
             return equals(o);
@@ -223,6 +233,9 @@ public class Ast {
     }
 
     public static class NullTyp extends Typ {
+        public NullTyp() {
+            this.typ = "Null";
+        }
         @Override
         public boolean isSubTypeOrEquals(Typ o) {
             return equals(o) ||
@@ -252,6 +265,7 @@ public class Ast {
         public final String cname;
 
         public ClasTyp(String cname) {
+            this.typ = "Class";
             this.cname = cname;
         }
 
@@ -283,6 +297,7 @@ public class Ast {
         public final Typ retTyp;
 
         public FuncTyp(Ast.MdDecl mdDecl) {
+            this.typ = "Func";
             this.argTyps = new ArrayList<>();
             for (Ast.VarDecl varDecl : mdDecl.args) {
                 this.argTyps.add(varDecl.type);
@@ -328,19 +343,7 @@ public class Ast {
         }
     }
 
-    public static enum StmtTyp {
-        STMT_IF,
-        STMT_WHILE,
-        STMT_READLN,
-        STMT_PRINTLN,
-        STMT_VARASSIGN,
-        STMT_FIELDASSIGN,
-        STMT_RETURN,
-        STMT_CALL
-    }
-
     public static abstract class Stmt extends Locatable implements Printable {
-        StmtTyp typ;
     }
 
     public static class IfStmt extends Stmt {
@@ -349,7 +352,6 @@ public class Ast {
         public final List<Stmt> elseStmtList;
 
         public IfStmt(Expr cond, List<Stmt> thenStmtList, List<Stmt> elseStmtList) {
-            this.typ = StmtTyp.STMT_IF;
             this.cond = cond;
             this.thenStmtList = Collections.unmodifiableList(new ArrayList<>(thenStmtList));
             this.elseStmtList = Collections.unmodifiableList(new ArrayList<>(elseStmtList));
@@ -385,7 +387,6 @@ public class Ast {
         public final List<Stmt> stmtList;
 
         public WhileStmt(Expr cond, List<Stmt> stmtList) {
-            this.typ = StmtTyp.STMT_WHILE;
             this.cond = cond;
             this.stmtList = Collections.unmodifiableList(new ArrayList<>(stmtList));
         }
@@ -411,7 +412,6 @@ public class Ast {
         public final String ident;
 
         public ReadlnStmt(String ident) {
-            this.typ = StmtTyp.STMT_READLN;
             this.ident = ident;
         }
 
@@ -430,7 +430,6 @@ public class Ast {
         public final Expr expr;
 
         public PrintlnStmt(Expr expr) {
-            this.typ = StmtTyp.STMT_PRINTLN;
             this.expr = expr;
         }
 
@@ -450,7 +449,6 @@ public class Ast {
         public final Expr rhs;
 
         public VarAssignStmt(String lhs, Expr rhs) {
-            this.typ = StmtTyp.STMT_VARASSIGN;
             this.lhs = lhs;
             this.rhs = rhs;
         }
@@ -472,7 +470,6 @@ public class Ast {
         public final Expr rhs;
 
         public FieldAssignStmt(Expr lhsExpr, String lhsField, Expr rhs) {
-            this.typ = StmtTyp.STMT_FIELDASSIGN;
             this.lhsExpr = lhsExpr;
             this.lhsField = lhsField;
             this.rhs = rhs;
@@ -495,7 +492,6 @@ public class Ast {
         public final Expr expr;
 
         public ReturnStmt(Expr expr) {
-            this.typ = StmtTyp.STMT_RETURN;
             this.expr = expr;
         }
 
@@ -515,7 +511,6 @@ public class Ast {
         public final List<Expr> args;
 
         public CallStmt(Expr target, List<Expr> args) {
-            this.typ = StmtTyp.STMT_CALL;
             this.target = target;
             this.args = Collections.unmodifiableList(new ArrayList<>(args));
         }

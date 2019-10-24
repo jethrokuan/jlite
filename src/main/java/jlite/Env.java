@@ -77,7 +77,7 @@ public class Env {
         // Override vars
         for (Ast.VarDecl varDecl : mdDecl.vars) {
             if (!isValidType(varDecl.type, classDescs)) {
-                errors.add(new SemanticException(String.format("invalid variable type '%s'", varDecl.type)));
+                errors.add(new SemanticException(varDecl, String.format("invalid variable type '%s'", varDecl.type)));
                 continue;
             }
             put(varDecl.ident, varDecl.type);

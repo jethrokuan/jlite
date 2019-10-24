@@ -21,8 +21,9 @@ public class StaticChecker {
     }
 
     private void checkClass(Ast.Clas clas) throws SemanticException {
+        ClasDescriptor desc = classDescs.get(clas.cname);
         Env env = new Env();
-        env.populate(clas.desc);
+        env.populate(desc);
 
         for (Ast.MdDecl mdDecl : clas.mdDeclList) {
             checkMdDecl(mdDecl, env);
@@ -37,7 +38,7 @@ public class StaticChecker {
         Ast.Typ lastTyp = checkStmts(mdDecl.stmts, env);
 
         if (!lastTyp.isSubTypeOrEquals(mdDecl.retTyp)) {
-            throw new SemanticException(String.format("Method body type '%s' not equal to return type '%s'", lastTyp, mdDecl.retTyp));
+            throw new SemanticException(mdDecl, String.format("Method body type '%s' not equal to return type '%s'", lastTyp, mdDecl.retTyp));
         }
     }
 
@@ -62,7 +63,7 @@ public class StaticChecker {
 
             Ast.Typ condTyp = checkExpr(cond, env);
             if (!condTyp.equals(new Ast.BoolTyp())) {
-                throw new SemanticException(String.format("Cond '%s': returns %s, expecting boolean.", cond.print(), condTyp.toString()));
+                throw new SemanticException(cond, String.format("Cond '%s': returns %s, expecting boolean.", cond.print(), condTyp.toString()));
             }
 
             List<Ast.Stmt> thenStmtList = ifStmt.thenStmtList;
@@ -75,7 +76,7 @@ public class StaticChecker {
             elseStmtTyp = checkStmts(elseStmtList, env);
 
             if (!(thenStmtTyp.isSubTypeOrEquals(elseStmtTyp) || elseStmtTyp.isSubTypeOrEquals(thenStmtTyp))) {
-                throw new SemanticException(String.format("then block and else block type incompatible. then: '%s', else '%s'", thenStmtTyp, elseStmtTyp));
+                throw new SemanticException(cond, String.format("then block and else block type incompatible. then: '%s', else '%s'", thenStmtTyp, elseStmtTyp));
             }
 
             return thenStmtTyp.isSubTypeOrEquals(elseStmtTyp) ? elseStmtTyp : thenStmtTyp; // Return the most general type
@@ -84,7 +85,7 @@ public class StaticChecker {
             Ast.Typ condTyp = checkExpr(whileStmt.cond, env);
 
             if (!condTyp.isSubTypeOrEquals(new Ast.BoolTyp())) {
-                throw new SemanticException(String.format("condition in while statement needs to be bool. Got '%s'", condTyp));
+                throw new SemanticException(whileStmt.cond, String.format("condition in while statement needs to be bool. Got '%s'", condTyp));
             }
 
             Ast.Typ whileStmtTyp = checkStmts(whileStmt.stmtList, env);
@@ -94,7 +95,7 @@ public class StaticChecker {
             Ast.ReadlnStmt readlnStmt = (Ast.ReadlnStmt) stmt;
 
             if (!env.contains(readlnStmt.ident)) {
-                throw new SemanticException(String.format("Unknown symbol: '%s'", readlnStmt.ident));
+                throw new SemanticException(stmt, String.format("Unknown symbol: '%s'", readlnStmt.ident));
             }
 
             Ast.Typ identTyp = env.getOne(readlnStmt.ident);
@@ -104,7 +105,7 @@ public class StaticChecker {
             validTypes.add(new Ast.StringTyp());
             validTypes.add(new Ast.BoolTyp());
             if (!validTypes.contains(identTyp)) {
-                throw new SemanticException("ident not of type Int, String or Bool.'");
+                throw new SemanticException(stmt, "ident not of type Int, String or Bool.'");
             }
             // TODO: need to assign vardecl for readln?
             return new Ast.VoidTyp();
@@ -118,7 +119,7 @@ public class StaticChecker {
             validTypes.add(new Ast.BoolTyp());
 
             if (!(validTypes.contains(exprTyp))) {
-                throw new SemanticException(String.format("println statement expr of type '%s', expecting Int, String or Bool", exprTyp));
+                throw new SemanticException(stmt, String.format("println statement expr of type '%s', expecting Int, String or Bool", exprTyp));
             }
         } else if (stmt instanceof Ast.VarAssignStmt) {
             Ast.VarAssignStmt varAssignStmt = (Ast.VarAssignStmt) stmt;
@@ -126,13 +127,13 @@ public class StaticChecker {
             Ast.Expr rhs = varAssignStmt.rhs;
 
             if (!env.contains(ident))
-                throw new SemanticException(String.format("unknown symbol '%s'", ident));
+                throw new SemanticException(varAssignStmt, String.format("unknown symbol '%s'", ident));
             Ast.Typ identTyp = env.getOne(ident);
 
             Ast.Typ rhsTyp = checkExpr(rhs, env);
 
             if (!rhsTyp.isSubTypeOrEquals(identTyp)) {
-                throw new SemanticException(String.format("varassign: rhs '%s' not subtype of ident type '%s'.", rhsTyp, identTyp));
+                throw new SemanticException(rhs, String.format("varassign: rhs '%s' not subtype of ident type '%s'.", rhsTyp, identTyp));
             }
 
             // TODO: need to get vardecl?
@@ -144,23 +145,23 @@ public class StaticChecker {
             Ast.Typ rhsExprTyp = checkExpr(fieldAssignStmt.rhs, env);
 
             if (!(lhsExprTyp instanceof Ast.ClasTyp)) {
-                throw new SemanticException(String.format("fieldassign: lhs expr of type '%s', expecting Class", lhsExprTyp));
+                throw new SemanticException(fieldAssignStmt.lhsExpr, String.format("fieldassign: lhs expr of type '%s', expecting Class", lhsExprTyp));
             }
 
             String cname = ((Ast.ClasTyp) lhsExprTyp).cname;
 
             if (!classDescs.containsKey(cname)) {
-                throw new SemanticException(String.format("fieldassign: no class '%s'", cname));
+                throw new SemanticException(fieldAssignStmt.lhsExpr, String.format("fieldassign: no class '%s'", cname));
             }
 
             ClasDescriptor desc = classDescs.get(cname);
 
             if (!desc.vars.containsKey(fieldAssignStmt.lhsField)) {
-                throw new SemanticException(String.format("fieldassign: class '%s' does not have field '%s'.", cname, fieldAssignStmt.lhsField));
+                throw new SemanticException(fieldAssignStmt.lhsExpr, String.format("fieldassign: class '%s' does not have field '%s'.", cname, fieldAssignStmt.lhsField));
             }
 
             if (!rhsExprTyp.isSubTypeOrEquals(lhsExprTyp)) {
-                throw new SemanticException(String.format("fieldassign, rhs of type '%s' not subtype of lhs of type '%s'", rhsExprTyp, lhsExprTyp));
+                throw new SemanticException(fieldAssignStmt.rhs, String.format("fieldassign: rhs of type '%s' not subtype of lhs of type '%s'", rhsExprTyp, lhsExprTyp));
             }
 
             return new Ast.VoidTyp();
@@ -171,17 +172,17 @@ public class StaticChecker {
 
             if (retTyp instanceof Ast.VoidTyp) {
                 if (returnStmt.expr != null) {
-                    throw new SemanticException("return: cannot return an expression for Void statement");
+                    throw new SemanticException(stmt, "return: cannot return an expression for Void statement");
                 }
                 return retTyp;
             } else {
                 if (returnStmt.expr == null) {
-                    throw new SemanticException("return: expr not null, but return type is null");
+                    throw new SemanticException(returnStmt.expr, "return: expr not null, but return type is null");
                 }
 
                 Ast.Typ exprTyp = checkExpr(returnStmt.expr, env);
                 if (!exprTyp.isSubTypeOrEquals(retTyp)) {
-                    throw new SemanticException(String.format("return: exprTyp '%s' not subtype of retTyp '%s'", exprTyp, retTyp));
+                    throw new SemanticException(returnStmt.expr, String.format("return: exprTyp '%s' not subtype of retTyp '%s'", exprTyp, retTyp));
                 }
 
                 return retTyp;
@@ -216,14 +217,14 @@ public class StaticChecker {
             if (env.contains("this")) {
                 expr.typ = env.getOne("this");
             } else {
-                throw new SemanticException("unknown symbol 'this'");
+                throw new SemanticException(expr, "unknown symbol 'this'");
             }
         } else if (expr instanceof Ast.IdentExpr) {
             String ident = ((Ast.IdentExpr) expr).ident;
             if (env.contains(ident)) {
                 expr.typ = env.getOne(ident);
             } else {
-                throw new SemanticException(String.format("unknown symbol '%s'", ident));
+                throw new SemanticException(expr, String.format("unknown symbol '%s'", ident));
             }
         } else if (expr instanceof Ast.UnaryExpr) {
             Ast.UnaryExpr unaryExpr = (Ast.UnaryExpr) expr;
@@ -232,13 +233,13 @@ public class StaticChecker {
             switch (unaryExpr.op) {
                 case NOT:
                     if (!ut.isSubTypeOrEquals(new Ast.BoolTyp())) {
-                        throw new SemanticException(String.format("NOT operation expects boolean, got %%s%s", ut));
+                        throw new SemanticException(ut, String.format("NOT operation expects boolean, got %%s%s", ut));
                     }
                     expr.typ = new Ast.BoolTyp();
                     return expr.typ;
                 case NEGATIVE:
                     if (!ut.isSubTypeOrEquals(new Ast.IntTyp())) {
-                        throw new SemanticException(String.format("NEG operation expects int, got %%s%s", ut));
+                        throw new SemanticException(ut, String.format("NEG operation expects int, got %%s%s", ut));
                     }
                     expr.typ = new Ast.IntTyp();
                     return expr.typ;
@@ -258,9 +259,9 @@ public class StaticChecker {
                 case DIV:
                     // [Arith]
                     if (!lhsTyp.isSubTypeOrEquals(new Ast.IntTyp()))
-                        throw new SemanticException(expr.toString() + "" + op + ": expected assignable to Int on lhs, got: " + lhsTyp);
+                        throw new SemanticException(lhs, String.format("%s: expected assignable to Int on lhs, got: %s", op, lhsTyp));
                     if (!rhsTyp.isSubTypeOrEquals(new Ast.IntTyp()))
-                        throw new SemanticException(expr.toString() + "" + op + ": expected assignable to Int on rhs, got: " + rhsTyp);
+                        throw new SemanticException(rhs, String.format("%s: expected assignable to Int on rhs, got: %s", op, rhsTyp));
                     expr.typ = new Ast.IntTyp();
                     return expr.typ;
                 case LT:
@@ -269,9 +270,9 @@ public class StaticChecker {
                 case GEQ:
                     // [Rel]
                     if (!lhsTyp.isSubTypeOrEquals(new Ast.IntTyp()))
-                        throw new SemanticException(expr.toString() + "" + op + ": expected assignable to Int on lhs, got: " + lhsTyp);
+                        throw new SemanticException(lhs, String.format("%s: expected assignable to Int on lhs, got: %s", op, lhsTyp));
                     if (!rhsTyp.isSubTypeOrEquals(new Ast.IntTyp()))
-                        throw new SemanticException(expr.toString() + "" + op + ": expected assignable to Int on rhs, got: " + rhsTyp);
+                        throw new SemanticException(rhs, String.format("%s: expected assignable to Int on rhs, got: %s", op, rhsTyp));
                     expr.typ = new Ast.BoolTyp();
                     return expr.typ;
                 case EQ:
@@ -279,16 +280,16 @@ public class StaticChecker {
                     // [Rel] enhanced for subtyping
                     // lhs is assignable to rhs or rhs is assignable to lhs
                     if (!(lhsTyp.isSubTypeOrEquals(rhsTyp) || rhsTyp.isSubTypeOrEquals(lhsTyp)))
-                        throw new SemanticException(expr + "" + op + ": expected LHS/RHS types to be compatible, got lhs: " + lhsTyp + " and rhs: " + rhsTyp);
+                        throw new SemanticException(expr, String.format("%s: expected LHS/RHS types to be compatible, got lhs: %s and rhs: %s", op, lhsTyp, rhsTyp));
                     expr.typ = new Ast.BoolTyp();
                     return expr.typ;
                 case AND:
                 case OR:
                     // [Bool]
                     if (!lhsTyp.isSubTypeOrEquals(new Ast.BoolTyp()))
-                        throw new SemanticException(expr + "" + op + ": expected assignable to Bool on lhs, got: " + lhsTyp);
+                        throw new SemanticException(expr, String.format("%s: expected assignable to Bool on lhs, got: %s", op, lhsTyp));
                     if (!rhsTyp.isSubTypeOrEquals(new Ast.BoolTyp()))
-                        throw new SemanticException(expr + "" + op + ": expected assignable to Bool on rhs, got: " + rhsTyp);
+                        throw new SemanticException(expr, String.format("%s: expected assignable to Bool on rhs, got: %s", op, rhsTyp));
                     expr.typ = new Ast.BoolTyp();
                     return expr.typ;
                 default:
@@ -298,19 +299,19 @@ public class StaticChecker {
             Ast.DotExpr dotExpr = (Ast.DotExpr) expr;
             Ast.Typ targetTyp = checkExpr(dotExpr.target, env); // can throw
             if (!(targetTyp instanceof Ast.ClasTyp)) {
-                throw new SemanticException(String.format("dotexpr: expected class type, got '%s'", targetTyp));
+                throw new SemanticException(expr, String.format("dotexpr: expected class type, got '%s'", targetTyp));
             }
 
             Ast.ClasTyp targetClasTyp = (Ast.ClasTyp) targetTyp;
 
             if (!classDescs.containsKey(targetClasTyp.cname)) {
-                throw new SemanticException(String.format("dotexpr: no such class '%s'", targetClasTyp.cname));
+                throw new SemanticException(dotExpr.target, String.format("dotexpr: no such class '%s'", targetClasTyp.cname));
             }
 
             ClasDescriptor desc = classDescs.get(targetClasTyp.cname);
 
             if (!desc.vars.containsKey(dotExpr.ident)) {
-                throw new SemanticException(String.format("dotexpr: no such field '%s' in class '%s'", dotExpr.ident, targetClasTyp.cname));
+                throw new SemanticException(dotExpr.target, String.format("dotexpr: no such field '%s' in class '%s'", dotExpr.ident, targetClasTyp.cname));
             }
 
             expr.typ = desc.vars.get(dotExpr.ident).type;
@@ -322,13 +323,13 @@ public class StaticChecker {
                 Ast.IdentExpr identExpr = (Ast.IdentExpr) callExpr.target;
 
                 if (!env.contains(identExpr.ident)) {
-                    throw new SemanticException(String.format("callexpr: no symbol '%s'", identExpr.ident));
+                    throw new SemanticException(identExpr, String.format("callexpr: no symbol '%s'", identExpr.ident));
                 }
 
                 Ast.Typ identTyp = env.getOne(identExpr.ident);
 
                 if (!(identTyp instanceof Ast.FuncTyp)) {
-                    throw new SemanticException(String.format("callexpr: expected func, got '%s'", identTyp));
+                    throw new SemanticException(identExpr, String.format("callexpr: expected func, got '%s'", identTyp));
                 }
 
                 ArrayList<Ast.Typ> argTyps = new ArrayList<>();
@@ -339,7 +340,7 @@ public class StaticChecker {
 
                 Collection<Ast.Typ> candidates = env.get(identExpr.ident);
                 if (candidates == null) {
-                    throw new SemanticException(String.format("No such target in env:'%s'", identExpr.ident));
+                    throw new SemanticException(identExpr, String.format("No such target in env:'%s'", identExpr.ident));
                 }
 
                 boolean hasCandidate = false;
@@ -364,19 +365,19 @@ public class StaticChecker {
                 Ast.DotExpr dotExpr = (Ast.DotExpr) callExpr.target;
                 Ast.Typ targetTyp = checkExpr(dotExpr.target, env);
                 if (!(targetTyp instanceof Ast.ClasTyp)) {
-                    throw new SemanticException(String.format("callexpr->dotexpr: target of type '%s', expecting Class", dotExpr.target));
+                    throw new SemanticException(callExpr.target, String.format("callexpr->dotexpr: target of type '%s', expecting Class", dotExpr.target));
                 }
                 Ast.ClasTyp targetClasTyp = (Ast.ClasTyp) targetTyp;
 
                 if (!classDescs.containsKey(targetClasTyp.cname)) {
-                    throw new SemanticException(String.format("callexpr: no such class '%s'", targetClasTyp.cname));
+                    throw new SemanticException(callExpr.target, String.format("callexpr: no such class '%s'", targetClasTyp.cname));
                 }
 
                 ClasDescriptor desc = classDescs.get(targetClasTyp.cname);
 
                 // Method access
                 if (!desc.methods.containsKey(dotExpr.ident)) {
-                    throw new SemanticException(String.format("callexpr: class '%s' does not have method '%s'", targetClasTyp.cname, dotExpr.ident));
+                    throw new SemanticException(dotExpr, String.format("callexpr: class '%s' does not have method '%s'", targetClasTyp.cname, dotExpr.ident));
                 }
 
                 ArrayList<Ast.Typ> argTyps = new ArrayList<>();
@@ -387,7 +388,7 @@ public class StaticChecker {
 
                 Collection<Ast.Typ> candidates = env.get(dotExpr.ident);
                 if (candidates == null) {
-                    throw new SemanticException(String.format("No such target in env:'%s'", dotExpr.ident));
+                    throw new SemanticException(dotExpr, String.format("No such target in env:'%s'", dotExpr.ident));
                 }
 
                 boolean hasCandidate = false;
@@ -402,7 +403,7 @@ public class StaticChecker {
                 }
 
                 if (!hasCandidate) {
-                    throw new SemanticException(String.format("No method signature '%s' for target '%s'", argTyps.toString(), dotExpr.ident));
+                    throw new SemanticException(dotExpr, String.format("No method signature '%s' for target '%s'", argTyps.toString(), dotExpr.ident));
                 }
 
                 assert retTyp != null;
@@ -410,7 +411,7 @@ public class StaticChecker {
                 return expr.typ;
 
             } else {
-                throw new SemanticException(String.format("callexpr: expecting ident or dotexpr, got '%s'", callExpr.getClass().toString()));
+                throw new SemanticException(expr, String.format("callexpr: expecting ident or dotexpr, got '%s'", callExpr.getClass().toString()));
             }
         } else if (expr instanceof Ast.NewExpr) {
             Ast.NewExpr newExpr = (Ast.NewExpr) expr;
@@ -419,7 +420,7 @@ public class StaticChecker {
             expr.typ = new Ast.ClasTyp(newExpr.cname);
             return expr.typ;
         } else {
-            throw new SemanticException(String.format("Unhandled expr type: %s", expr.getClass().toString()));
+            throw new SemanticException(expr, String.format("Unhandled expr type: %s", expr.getClass().toString()));
         }
 
         return expr.typ;
@@ -441,26 +442,26 @@ public class StaticChecker {
         for (Ast.Clas c : prog.clasList) {
             // Check if class name already exists
             if (classDescs.containsKey(c.cname)) {
-                throw new SemanticException(String.format("Duplicate class name '%s'", c.cname));
+                throw new SemanticException(c, String.format("Duplicate class name '%s'", c.cname));
             }
 
             ClasDescriptor desc = new ClasDescriptor(c);
-            c.desc = desc;
             classDescs.put(c.cname, desc);
         }
 
         for (Ast.Clas c : prog.clasList) {
+            ClasDescriptor desc = classDescs.get(c.cname);
             for (Ast.VarDecl varDecl : c.varDeclList) {
                 // Check if the declaration types are valid
                 if (!isValidType(varDecl.type)) {
-                    throw new SemanticException(String.format("Invalid var type '%s'", varDecl.type));
+                    throw new SemanticException(varDecl, String.format("Invalid var type '%s'", varDecl.type));
                 }
 
                 // Check if there are duplicate var declarations
-                if (c.desc.vars.containsKey(varDecl.ident)) {
-                    throw new SemanticException(String.format("Duplicate var declaration '%s'", varDecl.ident));
+                if (desc.vars.containsKey(varDecl.ident)) {
+                    throw new SemanticException(varDecl, String.format("Duplicate var declaration '%s'", varDecl.ident));
                 } else {
-                    c.desc.vars.put(varDecl.ident, varDecl);
+                    desc.vars.put(varDecl.ident, varDecl);
                 }
             }
 
@@ -469,21 +470,21 @@ public class StaticChecker {
 
                 for (Ast.VarDecl arg : mdDecl.args) {
                     if (args.containsKey(arg.ident)) {
-                        throw new SemanticException(String.format("Duplicate arg name '%s' in method '%s' of class '%s'", arg.ident, mdDecl.name, c.cname));
+                        throw new SemanticException(arg, String.format("Duplicate arg name '%s' in method '%s' of class '%s'", arg.ident, mdDecl.name, c.cname));
                     }
 
                     if (!isValidType(arg.type)) {
-                        throw new SemanticException(String.format("Invalid argument type '%s' for arg '%s' in method '%s' of class '%s'", arg.type, arg.ident, mdDecl.name, c.cname));
+                        throw new SemanticException(arg, String.format("Invalid argument type '%s' for arg '%s' in method '%s' of class '%s'", arg.type, arg.ident, mdDecl.name, c.cname));
                     }
 
                     args.put(arg.ident, arg);
                 }
 
                 Ast.FuncTyp funcTyp = new Ast.FuncTyp(mdDecl);
-                if (c.desc.hasMethodSignature(mdDecl.name, funcTyp)) {
-                    throw new SemanticException(String.format("Duplicate method signature '%s' for method '%s' of class '%s'", funcTyp.toString(), mdDecl.name, c.cname));
+                if (desc.hasMethodSignature(mdDecl.name, funcTyp)) {
+                    throw new SemanticException(mdDecl, String.format("Duplicate method signature '%s' for method '%s' of class '%s'", funcTyp.toString(), mdDecl.name, c.cname));
                 } else {
-                    c.desc.addMethodSignature(mdDecl.name, funcTyp);
+                    desc.addMethodSignature(mdDecl.name, funcTyp);
                 }
             }
         }
