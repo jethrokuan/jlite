@@ -37,6 +37,15 @@ Control-flow expressions are handled via backpatching as described in the Dragon
 Some expression types were not handled because I was unable to successfully figure out how to do so. These include call and ident expressions. Hence,
 the IR3 code generation portion is incomplete.
 
+### Done:
+- Name-mangling
+- Control-flow expressions via backpatching
+- generation of labels and temporaries
+- handling of arithmetic and logical expressions (e.g. j = 3 + 5 + 7)
+
+### Incomplete:
+- Expressions requiring resolution (e.g. call, dot expressions)
+
 ```text
 ./gradlew ir3 --args="test/ir/test.j" 
 
