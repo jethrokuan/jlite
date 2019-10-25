@@ -22,7 +22,6 @@ jlite.exceptions.SemanticException: 11:3: Duplicate method signature '[Int]->Voi
         at jlite.StaticChecker.init(StaticChecker.java:477)
         at jlite.StaticChecker.run(StaticChecker.java:13)
         at jlite.StaticChecker.main(StaticChecker.java:499)
-
 ```
 
 ## Codegen (INCOMPLETE)
@@ -37,3 +36,58 @@ Control-flow expressions are handled via backpatching as described in the Dragon
 
 Some expression types were not handled because I was unable to successfully figure out how to do so. These include call and ident expressions. Hence,
 the IR3 code generation portion is incomplete.
+
+```text
+./gradlew ir3 --args="test/ir/test.j" 
+
+> Task :ir3
+======= CData3 =======
+Data3 MainC{
+}
+
+Data3 Functional{
+  Int a;
+}
+
+======= CMtd3 =======
+Void main(this){
+  Int _t0;
+  Int _t1;
+  Functional _t2;
+  String _t3;
+  Functional fo;
+  Int i;
+  Int j;
+  readln(i);
+  Label0:
+  _t0 = 0;
+  if (j > _t0) goto Label1;
+  goto Label4;
+  Label1:
+  println(j);
+  goto Label0;
+  Label4:
+  _t1 = 0;
+  if (i > _t1) goto Label2;
+  goto Label3;
+  Label2:
+  _t2 = new Functional();
+  fo = _t2;
+  println(j);
+  goto Label5;
+  Label3:
+  _t3 = "Error";
+  println(_t3);
+  Label5:
+  return ;
+}
+
+Int %Functional_f_0(this, b){
+  Int _t4;
+  _t4 = 3;
+  return _t4;
+}
+
+=====fx== End of IR3 Program =======
+
+```
