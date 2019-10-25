@@ -65,7 +65,7 @@ Integer = [0-9]+
   "else" { return symbol("else",sym.ELSE); }
   "class" { return symbol("class",sym.CLASS); }
   "while" { return symbol("while",sym.WHILE); }
-  "realdln" { return symbol("readln",sym.READLN); }
+  "readln" { return symbol("readln",sym.READLN); }
   "println" { return symbol("println",sym.PRINTLN); }
   "return" { return symbol("return",sym.RETURN); }
   "this" { return symbol("this",sym.THIS); }

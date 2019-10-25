@@ -3,10 +3,7 @@ package jlite;
 import jlite.exceptions.SemanticException;
 import jlite.parser.Ast;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
 public class StaticChecker {
     private HashMap<String, ClasDescriptor> classDescs = new HashMap<>();
@@ -380,9 +377,9 @@ public class StaticChecker {
                     argTyps.add(checkExpr(arg, env));
                 }
 
-                Collection<Ast.Typ> candidates = env.get(dotExpr.ident);
-                if (candidates == null) {
-                    throw new SemanticException(dotExpr, String.format("No such target in env:'%s'", dotExpr.ident));
+                Set<Ast.FuncTyp> candidates = desc.methods.get(dotExpr.ident);
+                if (candidates.isEmpty()) {
+                    throw new SemanticException(dotExpr, String.format("No such method '%s' in class '%s'", dotExpr.ident, targetClasTyp.cname));
                 }
 
                 boolean hasCandidate = false;

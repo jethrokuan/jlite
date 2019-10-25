@@ -445,6 +445,7 @@ public class Ast {
     }
 
     public static class VarAssignStmt extends Stmt {
+        public Ast.VarDecl var; // resolved during typechecking phase
         public final String lhs;
         public final Expr rhs;
 
