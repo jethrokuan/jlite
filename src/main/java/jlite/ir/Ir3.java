@@ -216,7 +216,7 @@ public class Ir3 {
             super();
 
             this.var = v;
-            this.res = str;
+            this.res = String.format("\"%s\"", str);
         }
 
         public AssignStmt(Var v, boolean val) {
@@ -314,6 +314,122 @@ public class Ir3 {
             StringBuilder sb = new StringBuilder();
             indent(sb, i);
             sb.append(label).append(":");
+            return sb.toString();
+        }
+    }
+
+    public static abstract class JumpStmt extends Stmt implements Printable {
+        public LabelStmt label;
+
+        public abstract void setLabel(LabelStmt label);
+
+    }
+
+    public static class GotoStmt extends JumpStmt {
+        public GotoStmt(LabelStmt label) {
+            super();
+            this.label = label;
+        }
+
+        public GotoStmt() {
+            this.label = new Ir3.LabelStmt("null");
+        }
+
+        @Override
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            sb.append("goto ")
+                    .append(label.label)
+                    .append(";");
+            return sb.toString();
+        }
+
+        public void setLabel(LabelStmt label) {
+            this.label = label;
+        }
+    }
+
+    public static class CmpStmt extends JumpStmt {
+        Ast.BinaryOp op;
+        Rval lRv;
+        Rval rRv;
+        LabelStmt label;
+
+        public CmpStmt(Ast.BinaryOp op, Rval lRv, Rval rRv, LabelStmt label) {
+            super();
+            this.op = op;
+            this.lRv = lRv;
+            this.rRv = rRv;
+            this.label = label;
+        }
+
+        public CmpStmt(Ast.BinaryOp op, Rval lRv, Rval rRv) {
+            super();
+            this.op = op;
+            this.lRv = lRv;
+            this.rRv = rRv;
+            this.label = new Ir3.LabelStmt("null");
+        }
+
+        public void setLabel(LabelStmt label) {
+            this.label = label;
+        }
+
+        @Override
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            sb.append("if (")
+                    .append(lRv.print())
+                    .append(" ")
+                    .append(op)
+                    .append(" ")
+                    .append(rRv.print())
+                    .append(") goto ")
+                    .append(label.label)
+                    .append(";");
+            return sb.toString();
+        }
+    }
+
+    public static class IntConst extends Rval {
+        int val;
+
+        public IntConst(int i) {
+            super();
+            this.val = i;
+        }
+
+        @Override
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            sb.append(val);
+            return sb.toString();
+        }
+
+        @Override
+        public Ast.Typ getTyp() {
+            return new Ast.IntTyp();
+        }
+    }
+
+    public static class NewExpr extends Expr3 implements Printable {
+        Data data;
+
+        public NewExpr(Data data) {
+            super();
+            this.data = data;
+        }
+
+        @Override
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            sb.append("new ");
+            sb.append(data.cname)
+                    .append("()");
             return sb.toString();
         }
     }

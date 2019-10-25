@@ -45,3 +45,13 @@ task lex(type: JavaExec) {
   classpath = sourceSets.main.runtimeClasspath
   main = "jlite.lexer.Scanner"
 }
+
+task tc(type: JavaExec) {
+    classpath = sourceSets.main.runtimeClasspath
+    main = "jlite.StaticChecker"
+}
+
+task ir3(type: JavaExec) {
+    classpath = sourceSets.main.runtimeClasspath
+    main = "jlite.ir.Ir3Gen"
+}

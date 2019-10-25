@@ -4,10 +4,11 @@ class MainC {
         Int i;
         Int j ;
         readln(i) ;
-        j = 3 + 5 + 7;
+        while(j>0) {
+            println(j);
+        }
         if (i > 0) {
             fo = new Functional() ;
-            j = fo.f(i) ;
             println(j) ;
         }
         else {

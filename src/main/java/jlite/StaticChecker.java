@@ -2,6 +2,7 @@ package jlite;
 
 import jlite.exceptions.SemanticException;
 import jlite.parser.Ast;
+import jlite.parser.parser;
 
 import java.util.*;
 
@@ -487,5 +488,19 @@ public class StaticChecker {
      */
     private boolean isValidType(Ast.Typ type) {
         return !(type instanceof Ast.ClasTyp) || classDescs.containsKey(((Ast.ClasTyp) type).cname);
+    }
+
+    public static void main(String[] argv) {
+        for (int i = 0; i < argv.length; i++) {
+            String fileLoc = argv[i];
+            try {
+                Ast.Prog prog = parser.parse(fileLoc);
+                StaticChecker checker = new StaticChecker();
+                checker.run(prog);
+                System.out.println(prog.toJSON());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
     }
 }
