@@ -5,6 +5,7 @@ import jlite.parser.Ast;
 import jlite.parser.parser;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 
@@ -18,8 +19,7 @@ public class Ir3Gen {
     private HashMap<Ast.MdDecl, Ir3.Method> methodMap = new HashMap<>();
 
     public static void main(String[] argv) {
-        for (int i = 0; i < argv.length; i++) {
-            String fileLoc = argv[i];
+        Arrays.stream(argv).forEach(fileLoc -> {
             try {
                 Ast.Prog prog = parser.parse(fileLoc);
                 StaticChecker checker = new StaticChecker();
@@ -30,7 +30,7 @@ public class Ir3Gen {
             } catch (Exception e) {
                 e.printStackTrace();
             }
-        }
+        });
     }
 
     public Ir3.Prog gen(Ast.Prog prog) {
@@ -49,7 +49,7 @@ public class Ir3Gen {
             HashMap<String, Integer> nameCounter = new HashMap<>();
             for (Ast.MdDecl mdDecl : clas.mdDeclList) {
                 String name;
-                if (mdDecl.name == "main") {
+                if (mdDecl.name.equals("main")) {
                     name = mdDecl.name;
                 } else {
                     Integer count = nameCounter.getOrDefault(mdDecl.name, 0);
@@ -104,10 +104,8 @@ public class Ir3Gen {
                 varMap.put(v, var);
             }
 
-            ArrayList<Ir3.Stmt> irStmts = new ArrayList<>();
-
             StmtChunk chunk = genStmts(mdDecl.stmts, method);
-            irStmts.addAll(chunk.stmts);
+            ArrayList<Ir3.Stmt> irStmts = new ArrayList<>(chunk.stmts);
 
             if (!chunk.nextjumps.isEmpty()) {
                 Ir3.LabelStmt label = labelGenerator.gen();
@@ -186,7 +184,7 @@ public class Ir3Gen {
             return new StmtChunk(statementList, nextjumps);
         } else if (stmt instanceof Ast.IfStmt) {
             Ast.IfStmt ifStmt = (Ast.IfStmt) stmt;
-            CondChunk cond = doCond(ifStmt.cond, method, false);
+            CondChunk cond = doCond(ifStmt.cond, method);
             StmtChunk thenChunk = genStmts(ifStmt.thenStmtList, method);
             StmtChunk elseChunk = genStmts(ifStmt.elseStmtList, method);
 
@@ -219,7 +217,7 @@ public class Ir3Gen {
             Ast.Expr cond = ((Ast.WhileStmt) stmt).cond;
             Ast.WhileStmt whileStmt = (Ast.WhileStmt) stmt;
 
-            CondChunk condChunk = doCond(cond, method, false);
+            CondChunk condChunk = doCond(cond, method);
             StmtChunk stmtChunk = genStmts(whileStmt.stmtList, method);
 
             Ir3.LabelStmt topLabel = labelGenerator.gen();
@@ -286,7 +284,7 @@ public class Ir3Gen {
                 case EQ:
                 case AND:
                 case OR: {
-                    CondChunk cond = doCond(expr, method, false);
+                    CondChunk cond = doCond(expr, method);
                     Ir3.Var v = tempGenerator.gen(new Ast.BoolTyp(), method);
                     Ir3.LabelStmt trueLabel = null;
                     Ir3.LabelStmt falseLabel = null;
@@ -304,6 +302,13 @@ public class Ir3Gen {
                     statementList.addAll(cond.statements);
 
                     if (trueLabel != null && falseLabel != null) {
+                        // L_true:
+                        //   t = true
+                        //   goto L_end
+                        // L_false:
+                        //   t = false
+                        //   goto L_end
+                        // L_end
                         Ir3.LabelStmt restLabel = labelGenerator.gen();
                         statementList.add(trueLabel);
                         statementList.add(new Ir3.AssignStmt(v, true));
@@ -312,9 +317,13 @@ public class Ir3Gen {
                         statementList.add(new Ir3.AssignStmt(v, false));
                         statementList.add(restLabel);
                     } else if (trueLabel != null) {
+                        // L_true:
+                        // t = true
                         statementList.add(trueLabel);
                         statementList.add(new Ir3.AssignStmt(v, true));
                     } else if (falseLabel != null) {
+                        // L_false:
+                        // t = false
                         statementList.add(falseLabel);
                         statementList.add(new Ir3.AssignStmt(v, false));
                     }
@@ -325,6 +334,9 @@ public class Ir3Gen {
                 case MINUS:
                 case DIV:
                 case MULT: {
+                    // 1. Evaluate LHS = t1
+                    // 2. Evaluate RHS = t2
+                    // S(LHS) ++ S(RHS) ++ [t3 = t1 op t2]
                     RvalRes lRes = doRval(binaryExpr.lhs, method);
                     RvalRes rRes = doRval(binaryExpr.rhs, method);
                     Ir3.Var v = tempGenerator.gen(binaryExpr.typ, method);
@@ -332,6 +344,8 @@ public class Ir3Gen {
                     statementList.addAll(rRes.statements);
                     Ir3.Expr3 binaryExpr3 = new Ir3.BinaryExpr(binaryExpr.op, lRes.rv, rRes.rv);
                     statementList.add(new Ir3.AssignStmt(v, binaryExpr3));
+
+                    return new RvalRes(v, statementList);
                 }
                 default:
                     System.out.println("oops");
@@ -350,7 +364,7 @@ public class Ir3Gen {
         return new RvalRes(null, new ArrayList<>());
     }
 
-    private CondChunk doCond(Ast.Expr expr, Ir3.Method method, boolean negate) {
+    private CondChunk doCond(Ast.Expr expr, Ir3.Method method) {
         ArrayList<Ir3.Stmt> statements = new ArrayList<>();
         ArrayList<Ir3.JumpStmt> truejumps = new ArrayList<>();
         ArrayList<Ir3.JumpStmt> falsejumps = new ArrayList<>();
@@ -361,17 +375,9 @@ public class Ir3Gen {
             statements.add(gotoStmt);
 
             if (intLitExpr.val == 0) {
-                if (negate) {
-                    truejumps.add(gotoStmt);
-                } else {
-                    falsejumps.add(gotoStmt);
-                }
+                falsejumps.add(gotoStmt);
             } else {
-                if (negate) {
-                    falsejumps.add(gotoStmt);
-                } else {
-                    truejumps.add(gotoStmt);
-                }
+                truejumps.add(gotoStmt);
             }
 
             return new CondChunk(statements, truejumps, falsejumps);
@@ -380,78 +386,56 @@ public class Ir3Gen {
             Ast.BoolLitExpr boolLitExpr = (Ast.BoolLitExpr) expr;
             statements.add(gotoStmt);
 
-            if (!boolLitExpr.val) {
-                if (negate) {
-                    truejumps.add(gotoStmt);
-                } else {
-                    falsejumps.add(gotoStmt);
-                }
+            if (boolLitExpr.val) {
+                truejumps.add(gotoStmt);
             } else {
-                if (negate) {
-                    falsejumps.add(gotoStmt);
-                } else {
-                    truejumps.add(gotoStmt);
-                }
+                falsejumps.add(gotoStmt);
             }
 
             return new CondChunk(statements, truejumps, falsejumps);
         } else if (expr instanceof Ast.NullLitExpr) {
             Ir3.GotoStmt gotoStmt = new Ir3.GotoStmt();
             statements.add(gotoStmt);
-
-            if (negate) {
-                truejumps.add(gotoStmt);
-            } else {
-                falsejumps.add(gotoStmt);
-            }
-
+            falsejumps.add(gotoStmt);
             return new CondChunk(statements, truejumps, falsejumps);
         } else if (expr instanceof Ast.ThisExpr || expr instanceof Ast.StringLitExpr) {
             Ir3.GotoStmt gotoStmt = new Ir3.GotoStmt();
             statements.add(gotoStmt);
-            if (negate) {
-                falsejumps.add(gotoStmt);
-            } else {
-                truejumps.add(gotoStmt);
-            }
+            truejumps.add(gotoStmt);
             return new CondChunk(statements, truejumps, falsejumps);
         } else if (expr instanceof Ast.UnaryExpr) {
             Ast.UnaryOp op = ((Ast.UnaryExpr) expr).op;
             Ast.Expr exprExpr = ((Ast.UnaryExpr) expr).expr;
 
-            if (op == Ast.UnaryOp.NOT) return doCond(exprExpr, method, !negate);
-
-            RvalRes RvalRes = doRval(expr, method);
-            statements.addAll(RvalRes.statements);
-            Ir3.IntConst zero = new Ir3.IntConst(0);
-            Ir3.CmpStmt tstStmt = new Ir3.CmpStmt(Ast.BinaryOp.NEQ, RvalRes.rv, zero);
-            statements.add(tstStmt);
-            if (negate)
-                falsejumps.add(tstStmt);
-            else
-                truejumps.add(tstStmt);
-            Ir3.GotoStmt gotoStmt = new Ir3.GotoStmt();
-            statements.add(gotoStmt);
-            if (negate)
-                truejumps.add(gotoStmt);
-            else
-                falsejumps.add(gotoStmt);
-            return new CondChunk(statements, truejumps, falsejumps);
+            switch (op) {
+                case NOT:
+                    CondChunk chunk = doCond(exprExpr, method);
+                    statements.addAll(chunk.statements);
+                    truejumps.addAll(chunk.falsejumps);
+                    falsejumps.addAll(chunk.truejumps);
+                    return new CondChunk(statements, truejumps, falsejumps);
+                case NEGATIVE:
+                    RvalRes res = doRval(exprExpr, method);
+                    statements.addAll(res.statements);
+                    Ir3.IntConst zero = new Ir3.IntConst(0);
+                    Ir3.CmpStmt tstStmt = new Ir3.CmpStmt(Ast.BinaryOp.NEQ, res.rv, zero);
+                    statements.add(tstStmt);
+                    truejumps.add(tstStmt);
+                    Ir3.GotoStmt gotoStmt = new Ir3.GotoStmt();
+                    statements.add(gotoStmt);
+                    falsejumps.add(gotoStmt);
+                    return new CondChunk(statements, truejumps, falsejumps);
+            }
         } else if (expr instanceof Ast.BinaryExpr) {
             Ast.BinaryExpr binaryExpr = (Ast.BinaryExpr) expr;
             Ast.BinaryOp op = binaryExpr.op;
             Ast.Expr lhs = binaryExpr.lhs;
             Ast.Expr rhs = binaryExpr.rhs;
 
-            if (negate) {
-                op = flip(op);
-            }
-
             switch (op) {
                 case AND: { // &&
-                    CondChunk lhsChunk = doCond(lhs, method, negate);
-                    CondChunk rhsChunk = doCond(rhs, method, negate);
-                    // Create a label for rhs
+                    CondChunk lhsChunk = doCond(lhs, method);
+                    CondChunk rhsChunk = doCond(rhs, method);
                     Ir3.LabelStmt rhsLabel = labelGenerator.gen();
                     backpatch(lhsChunk.truejumps, rhsLabel);
                     statements.addAll(lhsChunk.statements);
@@ -464,8 +448,8 @@ public class Ir3Gen {
                     return new CondChunk(statements, truejumps, falsejumps);
                 }
                 case OR: { // ||
-                    CondChunk lhsChunk = doCond(lhs, method, negate);
-                    CondChunk rhsChunk = doCond(rhs, method, negate);
+                    CondChunk lhsChunk = doCond(lhs, method);
+                    CondChunk rhsChunk = doCond(rhs, method);
                     // Create a label for rhs
                     Ir3.LabelStmt rhsLabel = labelGenerator.gen();
                     backpatch(lhsChunk.falsejumps, rhsLabel);
@@ -498,45 +482,22 @@ public class Ir3Gen {
                 }
             }
         } else {
-            System.out.println("docond: Unhandled expr type: " + expr.getClass().toString());
+            System.out.println("Unhandled expr type: " + expr.getClass().toString());
         }
         return new CondChunk(statements, truejumps, falsejumps);
-    }
-
-    private Ast.BinaryOp flip(Ast.BinaryOp op) {
-        switch (op) {
-            case AND:
-                return Ast.BinaryOp.OR;
-            case OR:
-                return Ast.BinaryOp.AND;
-            case LT:
-                return Ast.BinaryOp.GEQ;
-            case GT:
-                return Ast.BinaryOp.LEQ;
-            case LEQ:
-                return Ast.BinaryOp.GT;
-            case GEQ:
-                return Ast.BinaryOp.LT;
-            case EQ:
-                return Ast.BinaryOp.NEQ;
-            case NEQ:
-                return Ast.BinaryOp.EQ;
-        }
-        return op;
     }
 
     private class TempGenerator {
         int counter;
 
-        public TempGenerator() {
+        TempGenerator() {
             counter = 0;
         }
 
         Ir3.Var gen(Ast.Typ typ, Ir3.Method method) {
-            String tempName = "_t" + counter;
+            String tempName = "_t" + counter++;
             Ir3.Var v = new Ir3.Var(typ, tempName);
             method.locals.add(v);
-            counter++;
             return v;
         }
     }
@@ -544,7 +505,7 @@ public class Ir3Gen {
     private class LabelGenerator {
         int counter;
 
-        public LabelGenerator() {
+        LabelGenerator() {
             counter = 0;
         }
 
@@ -558,17 +519,17 @@ public class Ir3Gen {
         Ir3.Rval rv;
         ArrayList<Ir3.Stmt> statements;
 
-        public RvalRes(Ir3.Rval rv, ArrayList<Ir3.Stmt> statements) {
+        RvalRes(Ir3.Rval rv, ArrayList<Ir3.Stmt> statements) {
             this.rv = rv;
             this.statements = statements;
         }
     }
 
     private class StmtChunk {
-        public ArrayList<Ir3.Stmt> stmts;
-        public ArrayList<Ir3.JumpStmt> nextjumps;
+        ArrayList<Ir3.Stmt> stmts;
+        ArrayList<Ir3.JumpStmt> nextjumps;
 
-        public StmtChunk(ArrayList<Ir3.Stmt> stmts, ArrayList<Ir3.JumpStmt> nextjumps) {
+        StmtChunk(ArrayList<Ir3.Stmt> stmts, ArrayList<Ir3.JumpStmt> nextjumps) {
             this.stmts = stmts;
             this.nextjumps = nextjumps;
         }

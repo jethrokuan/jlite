@@ -6,7 +6,7 @@ import java.util.ArrayList;
 import java.util.StringJoiner;
 
 public class Ir3 {
-    public static void indent(StringBuilder sb, int i) {
+    private static void indent(StringBuilder sb, int i) {
         while (i > 0) {
             sb.append("  ");
             i--;
@@ -332,7 +332,7 @@ public class Ir3 {
         }
 
         public GotoStmt() {
-            this.label = new Ir3.LabelStmt("null");
+            this.label = new Ir3.LabelStmt("___");
         }
 
         @Override
