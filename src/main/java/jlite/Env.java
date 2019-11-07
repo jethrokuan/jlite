@@ -109,7 +109,7 @@ public class Env {
         Collection<Ast.Typ> typList = store.get(name);
         if (typList.isEmpty()) {
             if (parent != null) return parent.get(name);
-            return null;
+            return new ArrayList<>();
         } else {
             return typList;
         }
