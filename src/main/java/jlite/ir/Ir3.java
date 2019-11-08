@@ -166,10 +166,10 @@ public class Ir3 {
     }
 
     public static class ReadlnStmt extends Stmt {
-        String ident;
+        Var var;
 
-        public ReadlnStmt(String ident) {
-            this.ident = ident;
+        public ReadlnStmt(Var var) {
+            this.var = var;
         }
 
         @Override
@@ -177,7 +177,7 @@ public class Ir3 {
             StringBuilder sb = new StringBuilder();
             indent(sb, i);
             sb.append("readln(")
-                    .append(ident)
+                    .append(var.print())
                     .append(");");
             return sb.toString();
         }
@@ -486,6 +486,122 @@ public class Ir3 {
         @Override
         public Ast.Typ getTyp() {
             return new Ast.BoolTyp();
+        }
+    }
+
+    public static class FieldAssignStatement extends Stmt {
+        Var target;
+        String field;
+        Rval v;
+
+        public FieldAssignStatement(Var target, String field, Rval v) {
+            super();
+            this.target = target;
+            this.field = field;
+            this.v = v;
+        }
+
+        @Override
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            sb.append(target.print())
+                    .append(".")
+                    .append(field)
+                    .append(" = ")
+                    .append(v.print())
+                    .append(";");
+            return sb.toString();
+        }
+    }
+
+    public static class CallStmt extends Stmt {
+        Var lhs;
+        Method method;
+        ArrayList<Rval> args;
+
+        public CallStmt(Var lhs, Method irMethod, ArrayList<Rval> args) {
+            this.lhs = lhs;
+            this.method = irMethod;
+            this.args = args;
+        }
+
+        public CallStmt(Method irMethod, ArrayList<Rval> args) {
+            this.lhs = null;
+            this.method = irMethod;
+            this.args = args;
+        }
+
+        @Override
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            StringJoiner sj = new StringJoiner(", ");
+            for (Rval arg : args) {
+                sj.add(arg.print());
+            }
+
+            if (lhs != null) {
+                sb.append(lhs.print())
+                        .append(" = ");
+            }
+
+            sb.append(method.name)
+                    .append("(")
+                    .append(sj.toString())
+                    .append(");");
+            return sb.toString();
+        }
+    }
+
+    public static class FieldAccessStatement extends Stmt {
+        Var lhs;
+        Var target;
+        String field;
+
+        public FieldAccessStatement(Var lhs, Var target, String field) {
+            super();
+            this.lhs = lhs;
+            this.target = target;
+            this.field = field;
+        }
+
+        @Override
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            sb.append(lhs.print())
+                    .append(" = ")
+                    .append(target.print())
+                    .append(".")
+                    .append(field)
+                    .append(";");
+            return sb.toString();
+        }
+    }
+
+    public static class UnaryStmt extends Stmt {
+        Var lhs;
+        Ast.UnaryOp op;
+        Rval rhs;
+
+        public UnaryStmt(Var lhs, Ast.UnaryOp op, Rval rhs) {
+            super();
+            this.lhs = lhs;
+            this.op = op;
+            this.rhs = rhs;
+        }
+
+        @Override
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            sb.append(lhs.print())
+                    .append(" = ")
+                    .append(op)
+                    .append(rhs.print())
+                    .append(";");
+            return sb.toString();
         }
     }
 }

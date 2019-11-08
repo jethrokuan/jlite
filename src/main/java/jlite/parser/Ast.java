@@ -295,8 +295,10 @@ public class Ast {
     public static class FuncTyp extends Typ {
         public final List<Typ> argTyps;
         public final Typ retTyp;
+        public MdDecl mdDecl;
 
         public FuncTyp(Ast.MdDecl mdDecl) {
+            this.mdDecl = mdDecl;
             this.typ = "Func";
             this.argTyps = new ArrayList<>();
             for (Ast.VarDecl varDecl : mdDecl.args) {
@@ -410,6 +412,7 @@ public class Ast {
 
     public static class ReadlnStmt extends Stmt {
         public final String ident;
+        public VarDecl varDecl;
 
         public ReadlnStmt(String ident) {
             this.ident = ident;
@@ -445,7 +448,7 @@ public class Ast {
     }
 
     public static class VarAssignStmt extends Stmt {
-        public Ast.VarDecl var; // resolved during typechecking phase
+        public Ast.VarDecl varDecl; // resolved during typechecking phase
         public final String lhs;
         public final Expr rhs;
 
@@ -510,6 +513,7 @@ public class Ast {
     public static class CallStmt extends Stmt {
         public final Expr target;
         public final List<Expr> args;
+        public MdDecl mdDecl;
 
         public CallStmt(Expr target, List<Expr> args) {
             this.target = target;
@@ -619,6 +623,7 @@ public class Ast {
 
     public static class IdentExpr extends Expr {
         public final String ident;
+        public VarDecl varDecl;
 
         public IdentExpr(String ident) {
             this.ident = ident;
@@ -697,6 +702,7 @@ public class Ast {
     public static class CallExpr extends Expr {
         public final Expr target;
         public final List<Expr> args;
+        public MdDecl mdDecl;
 
         public CallExpr(Expr target, List<Expr> args) {
             this.target = target;

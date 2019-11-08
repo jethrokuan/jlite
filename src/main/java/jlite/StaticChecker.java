@@ -43,7 +43,6 @@ public class StaticChecker {
     }
 
     private void checkMdDecl(Ast.MdDecl mdDecl) throws SemanticException {
-        ArrayList<SemanticException> errors = new ArrayList<>();
         env = new Env(env);
         env.populate(mdDecl, classDescs);
 
@@ -109,7 +108,7 @@ public class StaticChecker {
                 throw new SemanticException(stmt, String.format("Unknown symbol: '%s'", readlnStmt.ident));
             }
 
-            Ast.Typ identTyp = env.getOne(readlnStmt.ident);
+            Ast.Typ identTyp = env.getTypOne(readlnStmt.ident);
 
             ArrayList<Ast.Typ> validTypes = new ArrayList<>();
             validTypes.add(new Ast.IntTyp());
@@ -118,7 +117,7 @@ public class StaticChecker {
             if (!validTypes.contains(identTyp)) {
                 throw new SemanticException(stmt, "ident not of type Int, String or Bool.'");
             }
-            // TODO: need to assign vardecl for readln?
+            readlnStmt.varDecl = env.getVarDecl(readlnStmt.ident);
             return new Ast.VoidTyp();
         } else if (stmt instanceof Ast.PrintlnStmt) {
             Ast.PrintlnStmt printlnStmt = (Ast.PrintlnStmt) stmt;
@@ -139,7 +138,7 @@ public class StaticChecker {
 
             if (!env.contains(ident))
                 throw new SemanticException(varAssignStmt, String.format("unknown symbol '%s'", ident));
-            Ast.Typ identTyp = env.getOne(ident);
+            Ast.Typ identTyp = env.getTypOne(ident);
 
             Ast.Typ rhsTyp = checkExpr(rhs);
 
@@ -147,7 +146,7 @@ public class StaticChecker {
                 throw new SemanticException(rhs, String.format("varassign: rhs '%s' not subtype of ident type '%s'.", rhsTyp, identTyp));
             }
 
-            // TODO: need to get vardecl?
+            varAssignStmt.varDecl = env.getVarDecl(varAssignStmt.lhs);
 
             return new Ast.VoidTyp();
         } else if (stmt instanceof Ast.FieldAssignStmt) {
@@ -166,19 +165,20 @@ public class StaticChecker {
             }
 
             ClasDescriptor desc = classDescs.get(cname);
+            Ast.Typ lhsFieldTyp = desc.vars.get(fieldAssignStmt.lhsField).type;
 
             if (!desc.vars.containsKey(fieldAssignStmt.lhsField)) {
                 throw new SemanticException(fieldAssignStmt.lhsExpr, String.format("fieldassign: class '%s' does not have field '%s'.", cname, fieldAssignStmt.lhsField));
             }
 
-            if (!rhsExprTyp.isSubTypeOrEquals(lhsExprTyp)) {
+            if (!rhsExprTyp.isSubTypeOrEquals(lhsFieldTyp)) {
                 throw new SemanticException(fieldAssignStmt.rhs, String.format("fieldassign: rhs of type '%s' not subtype of lhs of type '%s'", rhsExprTyp, lhsExprTyp));
             }
 
             return new Ast.VoidTyp();
         } else if (stmt instanceof Ast.ReturnStmt) {
             Ast.ReturnStmt returnStmt = (Ast.ReturnStmt) stmt;
-            Ast.Typ retTyp = env.getOne("Ret");
+            Ast.Typ retTyp = env.getTypOne("Ret");
             assert retTyp != null;
 
             if (retTyp instanceof Ast.VoidTyp) {
@@ -202,7 +202,11 @@ public class StaticChecker {
             Ast.CallStmt callStmt = (Ast.CallStmt) stmt;
             Ast.CallExpr callExpr = new Ast.CallExpr(callStmt.target, callStmt.args);
 
-            return checkExpr(callExpr);
+            // after checking Expr, the callExpr will have a resolved mddecl
+            Ast.Typ callTyp = checkExpr(callExpr);
+            callStmt.mdDecl = callExpr.mdDecl;
+
+            return callTyp;
         } else {
             assert (false); // Should not reach here
         }
@@ -292,7 +296,7 @@ public class StaticChecker {
             return expr.typ;
         } else if (expr instanceof Ast.ThisExpr) {
             if (env.contains("this")) {
-                expr.typ = env.getOne("this");
+                expr.typ = env.getTypOne("this");
             } else {
                 throw new SemanticException(expr, "unknown symbol 'this'");
             }
@@ -300,7 +304,8 @@ public class StaticChecker {
         } else if (expr instanceof Ast.IdentExpr) {
             String ident = ((Ast.IdentExpr) expr).ident;
             if (env.contains(ident)) {
-                expr.typ = env.getOne(ident);
+                expr.typ = env.getTypOne(ident);
+                ((Ast.IdentExpr) expr).varDecl = env.getVarDecl(ident);
             } else {
                 throw new SemanticException(expr, String.format("unknown symbol '%s'", ident));
             }
@@ -409,28 +414,26 @@ public class StaticChecker {
                     argTyps.add(checkExpr(arg));
                 }
 
-                Collection<Ast.Typ> candidates = env.get(identExpr.ident);
+                Collection<Ast.Typ> candidates = env.getTyp(identExpr.ident);
                 if (candidates.isEmpty()) {
                     throw new SemanticException(identExpr, String.format("No such target in env:'%s'", identExpr.ident));
                 }
 
-                boolean hasCandidate = false;
-                Ast.Typ retTyp = null;
-                for (Ast.Typ candidate : candidates) {
-                    if (candidate instanceof Ast.FuncTyp) {
-                        if (((Ast.FuncTyp) candidate).argTyps.equals(argTyps)) {
-                            hasCandidate = true;
-                            retTyp = ((Ast.FuncTyp) candidate).retTyp;
+                Ast.FuncTyp candidate = null;
+                for (Ast.Typ c : candidates) {
+                    if (c instanceof Ast.FuncTyp) {
+                        if (((Ast.FuncTyp) c).argTyps.equals(argTyps)) {
+                            candidate = (Ast.FuncTyp) c;
                         }
                     }
                 }
 
-                if (!hasCandidate) {
+                if (candidate == null) {
                     throw new SemanticException(String.format("No method signature '%s' for target '%s'", argTyps.toString(), identExpr.ident));
                 }
 
-                assert retTyp != null;
-                expr.typ = retTyp;
+                expr.typ = candidate.retTyp;
+                callExpr.mdDecl = candidate.mdDecl;
                 return expr.typ;
             } else if (callExpr.target instanceof Ast.DotExpr) {
                 Ast.DotExpr dotExpr = (Ast.DotExpr) callExpr.target;
@@ -462,23 +465,22 @@ public class StaticChecker {
                     throw new SemanticException(dotExpr, String.format("No such method '%s' in class '%s'", dotExpr.ident, targetClasTyp.cname));
                 }
 
-                boolean hasCandidate = false;
-                Ast.Typ retTyp = null;
-                for (Ast.Typ candidate : candidates) {
-                    if (candidate instanceof Ast.FuncTyp) {
-                        if (((Ast.FuncTyp) candidate).argTyps.equals(argTyps)) {
-                            hasCandidate = true;
-                            retTyp = ((Ast.FuncTyp) candidate).retTyp;
+                Ast.FuncTyp candidate = null;
+                for (Ast.Typ c : candidates) {
+                    if (c instanceof Ast.FuncTyp) {
+                        if (((Ast.FuncTyp) c).argTyps.equals(argTyps)) {
+                            candidate = (Ast.FuncTyp) c;
                         }
                     }
                 }
 
-                if (!hasCandidate) {
+                if (candidate == null) {
                     throw new SemanticException(dotExpr, String.format("No method signature '%s' for target '%s'", argTyps.toString(), dotExpr.ident));
                 }
 
-                assert retTyp != null;
-                expr.typ = retTyp;
+                assert candidate.retTyp != null;
+                expr.typ = candidate.retTyp;
+                ((Ast.CallExpr) expr).mdDecl = candidate.mdDecl;
                 return expr.typ;
 
             } else {

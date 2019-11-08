@@ -4,19 +4,21 @@ import jlite.StaticChecker;
 import jlite.parser.Ast;
 import jlite.parser.parser;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
 public class Ir3Gen {
 
     TempGenerator tempGenerator = new TempGenerator();
     LabelGenerator labelGenerator = new LabelGenerator();
+
     private ArrayList<Ir3.Data> dataList = new ArrayList<>();
     private HashMap<String, Ir3.Data> dataMap = new HashMap<>();
     private ArrayList<Ir3.Method> methods = new ArrayList<>();
     private HashMap<Ast.MdDecl, Ir3.Method> methodMap = new HashMap<>();
+
+    Ir3.Var thisVar; // used to store the current "this"
+    private IdentityHashMap<Ast.VarDecl, Ir3.Var> varDeclVarMap;
+    private IdentityHashMap<Ast.VarDecl, String> varDeclFieldMap;
 
     public static void main(String[] argv) {
         Arrays.stream(argv).forEach(fileLoc -> {
@@ -68,23 +70,30 @@ public class Ir3Gen {
     }
 
     private void genClas(Ast.Clas clas) {
+        varDeclFieldMap = new IdentityHashMap<>();
+
+        for (Ast.VarDecl varDecl : clas.varDeclList) {
+            varDeclFieldMap.put(varDecl, varDecl.ident);
+        }
+
         for (Ast.MdDecl mdDecl : clas.mdDeclList) {
             Ir3.Method method = methodMap.get(mdDecl);
             methods.add(method);
+
+            varDeclVarMap = new IdentityHashMap<>();
 
             HashMap<String, Integer> nameCounter = new HashMap<>();
 
             ArrayList<Ir3.Var> args = new ArrayList<>();
             ArrayList<Ir3.Var> locals = new ArrayList<>();
-            HashMap<Ast.VarDecl, Ir3.Var> varMap = new HashMap<>();
 
             // generate args
-            Ir3.Var thisVar = new Ir3.Var(new Ast.ClasTyp(clas.cname), "this");
+            thisVar = new Ir3.Var(new Ast.ClasTyp(clas.cname), "this");
             args.add(thisVar);
             for (Ast.VarDecl arg : mdDecl.args) {
                 Ir3.Var var = new Ir3.Var(arg.type, arg.ident);
                 args.add(var);
-                varMap.put(arg, var);
+                varDeclVarMap.put(arg, var);
                 nameCounter.put(arg.ident, 1); // We can assume unique
             }
 
@@ -100,8 +109,8 @@ public class Ir3Gen {
                 }
 
                 Ir3.Var var = new Ir3.Var(v.type, name);
+                varDeclVarMap.put(v, var);
                 locals.add(var);
-                varMap.put(v, var);
             }
 
             StmtChunk chunk = genStmts(mdDecl.stmts, method);
@@ -152,7 +161,19 @@ public class Ir3Gen {
 
         if (stmt instanceof Ast.ReadlnStmt) {
             Ast.ReadlnStmt readlnStmt = (Ast.ReadlnStmt) stmt;
-            statementList.add(new Ir3.ReadlnStmt(readlnStmt.ident));
+            if (varDeclVarMap.containsKey(readlnStmt.varDecl)) {
+                Ir3.Var var = varDeclVarMap.get(readlnStmt.varDecl);
+                statementList.add(new Ir3.ReadlnStmt(var));
+            } else if (varDeclFieldMap.containsKey(readlnStmt.varDecl)) {
+                String field = varDeclFieldMap.get(readlnStmt.varDecl);
+                Ir3.Var temp = tempGenerator.gen(readlnStmt.varDecl.type, method);
+                assert (thisVar != null);
+                statementList.add(new Ir3.ReadlnStmt(temp));
+                statementList.add(new Ir3.FieldAssignStatement(thisVar, field, temp));
+            } else {
+                System.out.println("readln vardecl unresolved?");
+                assert (false);
+            }
             return new StmtChunk(statementList, nextjumps);
         } else if (stmt instanceof Ast.PrintlnStmt) {
             Ast.PrintlnStmt printlnStmt = (Ast.PrintlnStmt) stmt;
@@ -164,8 +185,19 @@ public class Ir3Gen {
             Ast.VarAssignStmt varAssignStmt = (Ast.VarAssignStmt) stmt;
             RvalChunk res = doRval(varAssignStmt.rhs, method);
             statementList.addAll(res.statements);
-            Ir3.Var var = new Ir3.Var(res.rval.getTyp(), varAssignStmt.lhs); // Hack: we don't care about type
-            statementList.add(new Ir3.AssignStmt(var, res.rval));
+
+            if (varDeclVarMap.containsKey(varAssignStmt.varDecl)) {
+                Ir3.Var var = varDeclVarMap.get(varAssignStmt.varDecl);
+                statementList.add(new Ir3.AssignStmt(var, res.rval));
+            } else if (varDeclFieldMap.containsKey(varAssignStmt.varDecl)) {
+                String field = varDeclFieldMap.get(varAssignStmt.varDecl);
+                assert (thisVar != null);
+                statementList.add(new Ir3.FieldAssignStatement(thisVar, field, res.rval));
+            } else {
+                System.out.println("VarAssignStmt vardecl unresolved?");
+                assert (false);
+            }
+
             return new StmtChunk(statementList, nextjumps);
         } else if (stmt instanceof Ast.ReturnStmt) {
             Ast.ReturnStmt returnStmt = (Ast.ReturnStmt) stmt;
@@ -178,9 +210,41 @@ public class Ir3Gen {
             statementList.add(new Ir3.ReturnStmt(rv));
             return new StmtChunk(statementList, nextjumps);
         } else if (stmt instanceof Ast.FieldAssignStmt) {
+            Ast.FieldAssignStmt fieldAssignStmt = (Ast.FieldAssignStmt) stmt;
+            RvalChunk rhs = doRval(fieldAssignStmt.rhs, method);
+            RvalChunk lhs = doRval(fieldAssignStmt.lhsExpr, method);
+
+            statementList.addAll(rhs.statements);
+            statementList.addAll(lhs.statements);
+            statementList.add(new Ir3.FieldAssignStatement((Ir3.Var) lhs.rval, fieldAssignStmt.lhsField, rhs.rval));
             return new StmtChunk(statementList, nextjumps);
         } else if (stmt instanceof Ast.CallStmt) {
             Ast.CallStmt callStmt = (Ast.CallStmt) stmt;
+            assert (callStmt.mdDecl != null);
+            Ir3.Method IrMethod = methodMap.get(callStmt.mdDecl);
+
+            ArrayList<Ir3.Rval> args = new ArrayList<>();
+
+            if (callStmt.target instanceof Ast.IdentExpr) {
+                args.add(thisVar);
+            } else if (callStmt.target instanceof Ast.DotExpr) {
+                Ast.DotExpr target = (Ast.DotExpr) callStmt.target;
+                RvalChunk rvalChunk = doRval(target.target, method);
+                statementList.addAll(rvalChunk.statements);
+                args.add(rvalChunk.rval);
+            } else {
+                assert (false);
+                System.out.println("oops");
+            }
+
+            for (Ast.Expr arg : callStmt.args) {
+                RvalChunk rvalChunk = doRval(arg, method);
+                statementList.addAll(rvalChunk.statements);
+                args.add(rvalChunk.rval);
+            }
+
+            statementList.add(new Ir3.CallStmt(IrMethod, args));
+
             return new StmtChunk(statementList, nextjumps);
         } else if (stmt instanceof Ast.IfStmt) {
             Ast.IfStmt ifStmt = (Ast.IfStmt) stmt;
@@ -265,11 +329,20 @@ public class Ir3Gen {
             Ast.BoolLitExpr boolLitExpr = (Ast.BoolLitExpr) expr;
             return new RvalChunk(new Ir3.BoolRval(boolLitExpr.val), statementList);
         } else if (expr instanceof Ast.IdentExpr) {
+            Ast.IdentExpr identExpr = (Ast.IdentExpr) expr;
+            assert identExpr.varDecl != null;
+            if (varDeclVarMap.containsKey(identExpr.varDecl)) {
+                Ir3.Var var = varDeclVarMap.get(identExpr.varDecl);
+                return new RvalChunk(var, statementList);
+            } else if (varDeclFieldMap.containsKey(identExpr.varDecl)) {
+                String field = varDeclFieldMap.get(identExpr.varDecl);
+                Ir3.Var temp = tempGenerator.gen(expr.typ, method);
+                statementList.add(new Ir3.FieldAccessStatement(temp, thisVar, field));
+            }
             Ir3.Var v = new Ir3.Var(expr.typ, ((Ast.IdentExpr) expr).ident);
             return new RvalChunk(v, statementList);
         } else if (expr instanceof Ast.ThisExpr) {
-            Ir3.Var v = new Ir3.Var(expr.typ, "this");
-            return new RvalChunk(v, statementList);
+            return new RvalChunk(thisVar, statementList);
         } else if (expr instanceof Ast.BinaryExpr) {
             Ast.BinaryExpr binaryExpr = (Ast.BinaryExpr) expr;
             switch (binaryExpr.op) {
@@ -347,6 +420,69 @@ public class Ir3Gen {
                 default:
                     System.out.println("oops");
             }
+        } else if (expr instanceof Ast.UnaryExpr) {
+            Ast.UnaryExpr unaryExpr = (Ast.UnaryExpr) expr;
+            switch (unaryExpr.op) {
+                case NOT:
+                    CondChunk condChunk = doCond(unaryExpr.expr, method);
+                    Ir3.Var temp = tempGenerator.gen(expr.typ, method);
+                    Ir3.LabelStmt trueLabel = null;
+                    Ir3.LabelStmt falseLabel = null;
+                    if (!condChunk.truejumps.isEmpty()) {
+                        trueLabel = labelGenerator.gen();
+                        backpatch(condChunk.falsejumps, trueLabel);
+                    }
+
+                    if (!condChunk.falsejumps.isEmpty()) {
+                        falseLabel = labelGenerator.gen();
+                        backpatch(condChunk.truejumps, falseLabel);
+                    }
+
+                    statementList.addAll(condChunk.statements);
+
+                    if (trueLabel != null && falseLabel != null) {
+                        // L_true:
+                        //   t = true
+                        //   goto L_end
+                        // L_false:
+                        //   t = false
+                        //   goto L_end
+                        // L_end
+                        Ir3.LabelStmt restLabel = labelGenerator.gen();
+                        statementList.add(trueLabel);
+                        statementList.add(new Ir3.AssignStmt(temp, new Ir3.BoolRval(true)));
+                        statementList.add(new Ir3.GotoStmt(restLabel));
+                        statementList.add(falseLabel);
+                        statementList.add(new Ir3.AssignStmt(temp, new Ir3.BoolRval(false)));
+                        statementList.add(restLabel);
+                    } else if (trueLabel != null) {
+                        // L_true:
+                        // t = true
+                        statementList.add(trueLabel);
+                        statementList.add(new Ir3.AssignStmt(temp, new Ir3.BoolRval(true)));
+                    } else if (falseLabel != null) {
+                        // L_false:
+                        // t = false
+                        statementList.add(falseLabel);
+                        statementList.add(new Ir3.AssignStmt(temp, new Ir3.BoolRval(false)));
+                    }
+                    return new RvalChunk(temp, statementList);
+                case NEGATIVE:
+                    RvalChunk rvalChunk = doRval(unaryExpr.expr, method);
+                    Ir3.Var t = tempGenerator.gen(expr.typ, method);
+                    statementList.addAll(rvalChunk.statements);
+                    statementList.add(new Ir3.UnaryStmt(t, Ast.UnaryOp.NEGATIVE, rvalChunk.rval));
+                    return new RvalChunk(t, statementList);
+                default:
+                    System.out.println("oops");
+            }
+        } else if (expr instanceof Ast.DotExpr) {
+            Ast.DotExpr dotExpr = (Ast.DotExpr) expr;
+            RvalChunk target = doRval(dotExpr.target, method);
+            Ir3.Var temp = tempGenerator.gen(expr.typ, method);
+            statementList.addAll(target.statements);
+            statementList.add(new Ir3.FieldAccessStatement(temp, (Ir3.Var) target.rval, dotExpr.ident));
+            return new RvalChunk(temp, statementList);
         } else if (expr instanceof Ast.NewExpr) {
             Ast.NewExpr newExpr = (Ast.NewExpr) expr;
             String cname = newExpr.cname;
@@ -354,6 +490,36 @@ public class Ir3Gen {
             Ir3.NewExpr newExpr3 = new Ir3.NewExpr(dataMap.get(cname));
             Ir3.AssignStmt assignStmt = new Ir3.AssignStmt(temp, newExpr3);
             statementList.add(assignStmt);
+            return new RvalChunk(temp, statementList);
+        } else if (expr instanceof Ast.CallExpr) {
+            Ast.CallExpr callExpr = (Ast.CallExpr) expr;
+
+            assert (callExpr.mdDecl != null);
+            Ir3.Method IrMethod = methodMap.get(callExpr.mdDecl);
+
+            ArrayList<Ir3.Rval> args = new ArrayList<>();
+
+            if (callExpr.target instanceof Ast.IdentExpr) {
+                args.add(thisVar);
+            } else if (callExpr.target instanceof Ast.DotExpr) {
+                Ast.DotExpr target = (Ast.DotExpr) callExpr.target;
+                RvalChunk rvalChunk = doRval(target.target, method);
+                statementList.addAll(rvalChunk.statements);
+                args.add(rvalChunk.rval);
+            } else {
+                assert (false);
+                System.out.println("oops");
+            }
+
+            for (Ast.Expr arg : callExpr.args) {
+                RvalChunk rvalChunk = doRval(arg, method);
+                statementList.addAll(rvalChunk.statements);
+                args.add(rvalChunk.rval);
+            }
+
+            Ir3.Var temp = tempGenerator.gen(expr.typ, method);
+            statementList.add(new Ir3.CallStmt(temp, IrMethod, args));
+
             return new RvalChunk(temp, statementList);
         } else {
             System.out.println("Unhandled expr type: " + expr.getClass().toString());

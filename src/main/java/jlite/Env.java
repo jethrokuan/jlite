@@ -14,7 +14,8 @@ import java.util.*;
  */
 public class Env {
     private final Env parent;
-    private final Multimap<String, Ast.Typ> store = ArrayListMultimap.create();
+    private final Multimap<String, Ast.Typ> typMap = ArrayListMultimap.create();
+    private final HashMap<String, Ast.VarDecl> varDeclMap = new HashMap<>();
 
     Env() {
         this.parent = null;
@@ -22,7 +23,6 @@ public class Env {
 
     Env(Env parent) {
         this.parent = parent;
-
     }
 
     /**
@@ -35,27 +35,40 @@ public class Env {
         for (Map.Entry<String, Set<Ast.FuncTyp>> entry : desc.methods.entrySet()) {
             String method = entry.getKey();
             for (Ast.FuncTyp t : entry.getValue()) {
-                put(method, t);
+                putTyp(method, t);
             }
         }
 
         for (Map.Entry<String, Ast.VarDecl> entry : desc.vars.entrySet()) {
             Ast.Typ t = entry.getValue().type;
-            put(entry.getKey(), t);
+            putTyp(entry.getKey(), t);
+            putVarDecl(entry.getKey(), entry.getValue());
         }
 
         // Add "this"
-        put("this", new Ast.ClasTyp(desc.cname));
+        putTyp("this", new Ast.ClasTyp(desc.cname));
     }
 
-    private void put(String name, Ast.Typ typ) {
-        store.put(name, typ);
+    Ast.VarDecl getVarDecl(String name) {
+        Ast.VarDecl varDecl = varDeclMap.get(name);
+        if (varDecl == null && parent != null) {
+            varDecl = parent.getVarDecl(name);
+        }
+        return varDecl;
     }
 
-    Ast.Typ getOne(String name) throws SemanticException {
-        Collection<Ast.Typ> typList = store.get(name);
+    private void putVarDecl(String name, Ast.VarDecl varDecl) {
+        varDeclMap.put(name, varDecl);
+    }
+
+    private void putTyp(String name, Ast.Typ typ) {
+        typMap.put(name, typ);
+    }
+
+    Ast.Typ getTypOne(String name) throws SemanticException {
+        Collection<Ast.Typ> typList = typMap.get(name);
         if (typList.isEmpty()) {
-            if (parent != null) return parent.getOne(name);
+            if (parent != null) return parent.getTypOne(name);
             return null;
         } else {
             if (typList.size() != 1) {
@@ -69,10 +82,11 @@ public class Env {
         ArrayList<SemanticException> errors = new ArrayList<>();
 
         for (Ast.VarDecl varDecl : mdDecl.args) {
-            store.put(varDecl.ident, varDecl.type);
+            typMap.put(varDecl.ident, varDecl.type);
+            varDeclMap.put(varDecl.ident, varDecl);
         }
 
-        store.put("Ret", mdDecl.retTyp);
+        typMap.put("Ret", mdDecl.retTyp);
 
         // Override vars
         for (Ast.VarDecl varDecl : mdDecl.vars) {
@@ -80,7 +94,8 @@ public class Env {
                 errors.add(new SemanticException(varDecl, String.format("invalid variable type '%s'", varDecl.type)));
                 continue;
             }
-            put(varDecl.ident, varDecl.type);
+            putTyp(varDecl.ident, varDecl.type);
+            varDeclMap.put(varDecl.ident, varDecl);
         }
 
         return errors;
@@ -96,19 +111,20 @@ public class Env {
         String parentString = parent == null ? "{}" : parent.toString();
         sb.append("parent: ").append(parentString).append("\n");
         sb.append("locals: ")
-                .append(store.toString());
+                .append(typMap.toString())
+                .append(varDeclMap.toString());
         return sb.toString();
     }
 
     boolean contains(String name) {
-        Collection<Ast.Typ> candidates = get(name);
-        return candidates != null && !get(name).isEmpty();
+        Collection<Ast.Typ> candidates = getTyp(name);
+        return candidates != null && !getTyp(name).isEmpty();
     }
 
-    public Collection<Ast.Typ> get(String name) {
-        Collection<Ast.Typ> typList = store.get(name);
+    public Collection<Ast.Typ> getTyp(String name) {
+        Collection<Ast.Typ> typList = typMap.get(name);
         if (typList.isEmpty()) {
-            if (parent != null) return parent.get(name);
+            if (parent != null) return parent.getTyp(name);
             return new ArrayList<>();
         } else {
             return typList;
