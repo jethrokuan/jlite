@@ -184,11 +184,11 @@ public class Ir3 {
     }
 
     public static class PrintlnStmt extends Stmt {
-        Var var;
+        Rval rval;
 
-        public PrintlnStmt(Var v) {
+        public PrintlnStmt(Rval rval) {
             super();
-            this.var = v;
+            this.rval = rval;
         }
 
         @Override
@@ -196,7 +196,7 @@ public class Ir3 {
             StringBuilder sb = new StringBuilder();
             indent(sb, i);
             sb.append("println(")
-                    .append(this.var.name)
+                    .append(this.rval.print())
                     .append(");");
             return sb.toString();
         }
@@ -204,45 +204,36 @@ public class Ir3 {
 
     public static class AssignStmt extends Stmt {
         Var var;
-        String res;
-
-        public AssignStmt(Var v, int val) {
-            super();
-            this.var = v;
-            this.res = String.valueOf(val);
-        }
-
-        public AssignStmt(Var v, String str) {
-            super();
-
-            this.var = v;
-            this.res = String.format("\"%s\"", str);
-        }
-
-        public AssignStmt(Var v, boolean val) {
-            super();
-            this.var = v;
-            this.res = val ? "true" : "false";
-        }
+        Rval rval;
+        Expr3 expr;
 
         public AssignStmt(Var v, Expr3 expr3) {
             super();
             this.var = v;
-            this.res = expr3.print();
+            this.expr = expr3;
+            this.rval = null;
         }
 
         public AssignStmt(Var v, Rval rv) {
             super();
-            assert rv instanceof Var;
             this.var = v;
-            this.res = ((Var) rv).name;
+            this.rval = rv;
+            this.expr = null;
         }
 
         @Override
         public String print(int i) {
+            assert (this.rval != null || this.expr != null);
             StringBuilder sb = new StringBuilder();
             indent(sb, i);
-            sb.append(String.format("%s = %s;", var.name, res));
+            StringBuilder output = new StringBuilder();
+            if (this.rval != null) {
+                output.append(this.rval.print());
+            } else if (this.expr != null) {
+                output.append(this.expr.print());
+            }
+
+            sb.append(String.format("%s = %s;", var.name, output.toString()));
             return sb.toString();
         }
     }
@@ -431,6 +422,70 @@ public class Ir3 {
             sb.append(data.cname)
                     .append("()");
             return sb.toString();
+        }
+    }
+
+    public static class IntRval extends Rval {
+        Integer i;
+
+        public IntRval(Integer i) {
+            this.i = i;
+        }
+
+        @Override
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            sb.append(this.i);
+            return sb.toString();
+        }
+
+        @Override
+        public Ast.Typ getTyp() {
+            return new Ast.IntTyp();
+        }
+    }
+
+    public static class StringRval extends Rval {
+        String s;
+
+        public StringRval(String s) {
+            this.s = s;
+        }
+
+        @Override
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            sb.append(this.s);
+            return sb.toString();
+        }
+
+        @Override
+        public Ast.Typ getTyp() {
+            return new Ast.StringTyp();
+        }
+    }
+
+    public static class BoolRval extends Rval {
+        boolean b;
+
+        public BoolRval(boolean b) {
+            this.b = b;
+        }
+
+        @Override
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            String s = this.b ? "true" : "false";
+            sb.append(s);
+            return sb.toString();
+        }
+
+        @Override
+        public Ast.Typ getTyp() {
+            return new Ast.BoolTyp();
         }
     }
 }
