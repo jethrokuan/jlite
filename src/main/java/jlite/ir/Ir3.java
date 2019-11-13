@@ -3,6 +3,7 @@ package jlite.ir;
 import jlite.parser.Ast;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.StringJoiner;
 
 public class Ir3 {
@@ -22,8 +23,8 @@ public class Ir3 {
     }
 
     public static class Prog implements Printable {
-        ArrayList<Data> datas;
-        ArrayList<Method> methods;
+        public ArrayList<Data> datas;
+        public ArrayList<Method> methods;
 
         public Prog(ArrayList<Data> datas, ArrayList<Method> methods) {
             this.datas = datas;
@@ -97,6 +98,7 @@ public class Ir3 {
         public ArrayList<Var> args;
         public ArrayList<Var> locals;
         public ArrayList<Stmt> statements;
+        public ArrayList<Block> blocks;
 
         String name;
         Ast.Typ retTyp;
@@ -107,6 +109,7 @@ public class Ir3 {
             this.args = new ArrayList<>();
             this.locals = new ArrayList<>();
             this.statements = new ArrayList<>();
+            this.blocks = null;
         }
 
         @Override
@@ -129,12 +132,31 @@ public class Ir3 {
                 sb.append(String.format("%s %s;\n", local.typ, local.name));
             }
 
+            if (blocks != null) {
+                sb.append(printBlocks(i));
+            } else {
+                sb.append(printStatements(i));
+            }
+            i--;
+            sb.append("}\n");
+            return sb.toString();
+        }
+
+        private String printBlocks(int i) {
+            StringBuilder sb = new StringBuilder();
+            for (Block b : blocks) {
+                sb.append(b.print(i));
+            }
+            return sb.toString();
+        }
+
+        public String printStatements(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
             for (Stmt stmt : statements) {
                 sb.append(stmt.print(i))
                         .append("\n");
             }
-            i--;
-            sb.append("}\n");
             return sb.toString();
         }
     }
@@ -294,7 +316,7 @@ public class Ir3 {
     }
 
     public static class LabelStmt extends Stmt implements Printable {
-        String label;
+        public String label;
 
         public LabelStmt(String label) {
             this.label = label;
@@ -313,6 +335,10 @@ public class Ir3 {
         public LabelStmt label;
 
         public abstract void setLabel(LabelStmt label);
+
+        public LabelStmt getLabel() {
+            return label;
+        }
 
     }
 
@@ -345,7 +371,6 @@ public class Ir3 {
         Ast.BinaryOp op;
         Rval lRv;
         Rval rRv;
-        LabelStmt label;
 
         public CmpStmt(Ast.BinaryOp op, Rval lRv, Rval rRv, LabelStmt label) {
             super();
@@ -601,6 +626,30 @@ public class Ir3 {
                     .append(op)
                     .append(rhs.print())
                     .append(";");
+            return sb.toString();
+        }
+    }
+
+    public static class Block implements Printable {
+        public LabelStmt labelStmt;
+        public ArrayList<Ir3.Stmt> statements;
+        public HashSet<Block> outgoing = new HashSet<>();
+        public HashSet<Block> incoming = new HashSet<>();
+
+        public Block() {
+            statements = new ArrayList<>();
+        }
+
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            sb.append(labelStmt.print())
+                    .append("\n");
+            i++;
+            for (Stmt stmt : statements) {
+                sb.append(stmt.print(i)).append("\n");
+            }
+            i--;
             return sb.toString();
         }
     }
