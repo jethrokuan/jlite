@@ -30,11 +30,11 @@ public class DominancePass {
         }
         for (Ir3.Block block : method.blocks) {
             if (block.incoming.size() < 2) continue;
-            Ir3.Block idom = method.dominance.idom.get(block);
+            Ir3.Block top = method.dominance.idom.get(block);
             for (Ir3.Block pred : block.incoming) {
                 Ir3.Block curr = pred;
-                while (curr != idom) {
-                    method.dominance.frontier.get(block).add(block);
+                while (curr != top) {
+                    method.dominance.frontier.get(curr).add(block);
                     curr = method.dominance.idom.get(curr);
                 }
             }

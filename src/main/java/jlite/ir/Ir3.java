@@ -2,9 +2,8 @@ package jlite.ir;
 
 import jlite.parser.Ast;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.StringJoiner;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class Ir3 {
     private static void indent(StringBuilder sb, int i) {
@@ -188,6 +187,18 @@ public class Ir3 {
     }
 
     public static abstract class Stmt implements Printable {
+        public List<Var> getDefs() {
+            return Collections.emptyList();
+        }
+
+        public List<Var> getUses() {
+            return getRvals().stream()
+                    .filter(rval -> rval instanceof Ir3.Var)
+                    .map(rval -> (Ir3.Var) rval)
+                    .collect(Collectors.toList());
+        }
+
+        public abstract List<Rval> getRvals();
     }
 
     public static class ReadlnStmt extends Stmt {
@@ -205,6 +216,16 @@ public class Ir3 {
                     .append(var.print())
                     .append(");");
             return sb.toString();
+        }
+
+        @Override
+        public List<Var> getDefs() {
+            return Arrays.asList(var);
+        }
+
+        @Override
+        public List<Rval> getRvals() {
+            return Collections.emptyList();
         }
     }
 
@@ -224,6 +245,11 @@ public class Ir3 {
                     .append(this.rval.print())
                     .append(");");
             return sb.toString();
+        }
+
+        @Override
+        public List<Rval> getRvals() {
+            return Arrays.asList(rval);
         }
     }
 
@@ -261,6 +287,20 @@ public class Ir3 {
             sb.append(String.format("%s = %s;", var.name, output.toString()));
             return sb.toString();
         }
+
+        @Override
+        public List<Var> getDefs() {
+            return Arrays.asList(var);
+        }
+
+        @Override
+        public List<Rval> getRvals() {
+            if (rval != null) {
+                return Arrays.asList(rval);
+            } else {
+                return expr.getRvals();
+            }
+        }
     }
 
     public abstract static class Rval implements Printable {
@@ -269,6 +309,7 @@ public class Ir3 {
 
     public abstract static class Expr3 implements Printable {
 
+        public abstract List<Rval> getRvals();
     }
 
     public static class ReturnStmt extends Stmt implements Printable {
@@ -290,6 +331,15 @@ public class Ir3 {
             }
             sb.append(";");
             return sb.toString();
+        }
+
+        @Override
+        public List<Rval> getRvals() {
+            if (rv == null) {
+                return Collections.emptyList();
+            } else {
+                return Arrays.asList(rv);
+            }
         }
     }
 
@@ -316,6 +366,11 @@ public class Ir3 {
                     .append(rhs.print());
             return sb.toString();
         }
+
+        @Override
+        public List<Rval> getRvals() {
+            return Arrays.asList(lhs, rhs);
+        }
     }
 
     public static class LabelStmt extends Stmt implements Printable {
@@ -331,6 +386,11 @@ public class Ir3 {
             indent(sb, i);
             sb.append(label).append(":");
             return sb.toString();
+        }
+
+        @Override
+        public List<Rval> getRvals() {
+            return Collections.emptyList();
         }
     }
 
@@ -367,6 +427,11 @@ public class Ir3 {
 
         public void setLabel(LabelStmt label) {
             this.label = label;
+        }
+
+        @Override
+        public List<Rval> getRvals() {
+            return Collections.emptyList();
         }
     }
 
@@ -410,6 +475,11 @@ public class Ir3 {
                     .append(";");
             return sb.toString();
         }
+
+        @Override
+        public List<Rval> getRvals() {
+            return Arrays.asList(lRv, rRv);
+        }
     }
 
     public static class IntConst extends Rval {
@@ -450,6 +520,11 @@ public class Ir3 {
             sb.append(data.cname)
                     .append("()");
             return sb.toString();
+        }
+
+        @Override
+        public List<Rval> getRvals() {
+            return Collections.emptyList();
         }
     }
 
@@ -541,6 +616,11 @@ public class Ir3 {
                     .append(";");
             return sb.toString();
         }
+
+        @Override
+        public List<Rval> getRvals() {
+            return Arrays.asList(v);
+        }
     }
 
     public static class CallStmt extends Stmt {
@@ -580,6 +660,16 @@ public class Ir3 {
                     .append(");");
             return sb.toString();
         }
+
+        @Override
+        public List<Var> getDefs() {
+            return Arrays.asList(lhs);
+        }
+
+        @Override
+        public List<Rval> getRvals() {
+            return args;
+        }
     }
 
     public static class FieldAccessStatement extends Stmt {
@@ -606,6 +696,16 @@ public class Ir3 {
                     .append(";");
             return sb.toString();
         }
+
+        @Override
+        public List<Var> getDefs() {
+            return Arrays.asList(lhs);
+        }
+
+        @Override
+        public List<Rval> getRvals() {
+            return Arrays.asList(target);
+        }
     }
 
     public static class UnaryStmt extends Stmt {
@@ -630,6 +730,16 @@ public class Ir3 {
                     .append(rhs.print())
                     .append(";");
             return sb.toString();
+        }
+
+        @Override
+        public List<Var> getDefs() {
+            return Arrays.asList(lhs);
+        }
+
+        @Override
+        public List<Rval> getRvals() {
+            return Arrays.asList(rhs);
         }
     }
 
@@ -656,6 +766,45 @@ public class Ir3 {
             }
             i--;
             return sb.toString();
+        }
+    }
+
+    public static class PhiStmt extends Stmt {
+        public ArrayList<Var> args;
+        Var v;
+
+        public PhiStmt(Var v, int size) {
+            super();
+            this.v = v;
+            this.args = new ArrayList<>();
+            for (int i = 0; i < size; i++) {
+                this.args.add(new Var(new Ast.StringTyp(), "UNSET"));
+            }
+        }
+
+        @Override
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            StringJoiner joiner = new StringJoiner(", ");
+            for (Var arg : args) {
+                joiner.add(arg.print());
+            }
+            sb.append(v.print())
+                    .append(" = phi(")
+                    .append(joiner.toString())
+                    .append(")");
+            return sb.toString();
+        }
+
+        @Override
+        public List<Var> getDefs() {
+            return Arrays.asList(v);
+        }
+
+        @Override
+        public List<Rval> getRvals() {
+            return Collections.emptyList();
         }
     }
 }
