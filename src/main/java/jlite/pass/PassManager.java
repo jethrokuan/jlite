@@ -7,6 +7,8 @@ public class PassManager {
         FlowPass flowPass = new FlowPass();
         flowPass.pass(ir3); // Basic Block and CFG Construction
         DominancePass dominancePass = new DominancePass();
-        dominancePass.pass(ir3); // Compute Dominance
+        dominancePass.pass(ir3); // Compute Dominance and Dominance Frontiers
+        SSAPass ssaPass = new SSAPass();
+        ssaPass.pass(ir3);
     }
 }
