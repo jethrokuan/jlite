@@ -5,6 +5,7 @@ import jlite.ir.Ir3;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.HashMap;
+import java.util.HashSet;
 
 /**
  * The first three-address instruction of the intermediate code is a leader.
@@ -12,6 +13,9 @@ import java.util.HashMap;
  * Instructions which immediately follows jump are considered as leaders
  */
 public class FlowPass {
+    private int postOrderIndex = 0;
+    private int preOrderIndex = 0;
+
     public void pass(Ir3.Prog prog) {
         for (Ir3.Method method : prog.methods) {
             doMethod(method);
@@ -136,5 +140,30 @@ public class FlowPass {
         }
 
         method.blocks = blocks;
+        createIterators(method);
+    }
+
+    private void createIterators(Ir3.Method method) {
+        assert method.blocks != null;
+        postOrderIndex = 0;
+        preOrderIndex = 0;
+        method.blockPreOrder = new ArrayList<>();
+        method.blockPostOrder = new ArrayList<>();
+        HashSet<Ir3.Block> visited = new HashSet<>();
+        dfs(method.blocks.get(0), visited, method);
+    }
+
+    private void dfs(Ir3.Block block, HashSet<Ir3.Block> visited, Ir3.Method method) {
+        visited.add(block);
+        method.blockPreOrder.add(block);
+        block.preOrderIndex = preOrderIndex++;
+
+        for (Ir3.Block b : block.outgoing) {
+            if (!visited.contains(b)) {
+                dfs(b, visited, method);
+            }
+        }
+        method.blockPostOrder.add(block);
+        block.postOrderIndex = postOrderIndex++;
     }
 }

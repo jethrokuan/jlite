@@ -99,6 +99,9 @@ public class Ir3 {
         public ArrayList<Var> locals;
         public ArrayList<Stmt> statements;
         public ArrayList<Block> blocks;
+        public ArrayList<Block> blockPreOrder;
+        public ArrayList<Block> blockPostOrder;
+        public DominanceInfo dominance;
 
         String name;
         Ast.Typ retTyp;
@@ -635,6 +638,8 @@ public class Ir3 {
         public ArrayList<Ir3.Stmt> statements;
         public HashSet<Block> outgoing = new HashSet<>();
         public HashSet<Block> incoming = new HashSet<>();
+        public int preOrderIndex;
+        public int postOrderIndex;
 
         public Block() {
             statements = new ArrayList<>();
