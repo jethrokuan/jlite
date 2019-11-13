@@ -5,14 +5,39 @@ import jlite.ir.DominanceInfo;
 import jlite.ir.Ir3;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 
+/**
+ * Computes Dominance, and stores it in method.dominance.
+ * <p>
+ * Uses data-flow analysis:
+ * https://www.cs.rice.edu/~keith/EMBED/dom.pdf
+ */
 public class DominancePass {
     HashMap<Ir3.Block, Ir3.Block> idom = new HashMap<>();
 
     public void pass(Ir3.Prog prog) {
         for (Ir3.Method method : prog.methods) {
             method.dominance = computeDominance(method);
+            computeFrontier(method);
+        }
+    }
+
+    private void computeFrontier(Ir3.Method method) {
+        for (Ir3.Block block : method.blocks) {
+            method.dominance.frontier.put(block, new HashSet<>());
+        }
+        for (Ir3.Block block : method.blocks) {
+            if (block.incoming.size() < 2) continue;
+            Ir3.Block idom = method.dominance.idom.get(block);
+            for (Ir3.Block pred : block.incoming) {
+                Ir3.Block curr = pred;
+                while (curr != idom) {
+                    method.dominance.frontier.get(block).add(block);
+                    curr = method.dominance.idom.get(curr);
+                }
+            }
         }
     }
 
