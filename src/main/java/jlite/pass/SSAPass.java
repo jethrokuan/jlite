@@ -11,12 +11,15 @@ import java.util.HashSet;
  * Use Dominance and Dominance Frontiers to Convert to SSA form
  */
 public class SSAPass {
+    private ArrayList<Ir3.Var> newLocals = new ArrayList<>();
+    private HashMap<Ir3.Var, Ir3.Var> reachingDefMap;
+    private HashMap<Ir3.Var, Ir3.Block> defMap;
+    private int counter = 0;
 
     public void pass(Ir3.Prog prog) {
         for (Ir3.Method method : prog.methods) {
             doMethod(method);
         }
-        System.out.print(prog.print());
     }
 
     /**
@@ -29,6 +32,7 @@ public class SSAPass {
         assert method.blocks != null; // assert basic block constructed
         assert method.dominance != null; // Check that dominance info is computed
         placePhis(method);
+        renameVariables(method);
     }
 
     private void placePhis(Ir3.Method method) {
@@ -73,6 +77,89 @@ public class SSAPass {
                 }
             }
         }
+    }
 
+    private void renameVariables(Ir3.Method method) {
+        Ir3.Block first = method.blocks.get(0);
+        reachingDefMap = new HashMap<>();
+        defMap = new HashMap<>();
+
+        for (Ir3.Var v : method.args) {
+            reachingDefMap.put(v, v);
+            defMap.put(v, first);
+        }
+
+        for (Ir3.Var v : method.locals) {
+            defMap.put(v, first);
+        }
+
+        for (Ir3.Block block : method.dominance.preorder) {
+            for (Ir3.Stmt stmt : block.statements) {
+                for (Ir3.Rval rval : stmt.getRvals()) {
+                    if (!(rval instanceof Ir3.VarRval)) continue;
+                    Ir3.VarRval varRval = (Ir3.VarRval) rval;
+                    Ir3.Var newVar = doUse(varRval.var, block, method);
+                    varRval.var = newVar;
+                }
+
+                if (stmt instanceof Ir3.FieldAssignStatement) {
+                    Ir3.FieldAssignStatement fieldAssignStatement = (Ir3.FieldAssignStatement) stmt;
+                    fieldAssignStatement.target = doUse(fieldAssignStatement.target, block, method);
+                }
+
+                for (Ir3.Var def : stmt.getDefs()) {
+                    if (def == null) continue;
+                    updateReachingDef(def, block, method);
+                    Ir3.Var newVar = getNewVar(def);
+                    newLocals.add(newVar);
+                    stmt.updateDef(newVar);
+                    defMap.put(newVar, block);
+                    reachingDefMap.put(newVar, reachingDefMap.get(def));
+                    reachingDefMap.put(def, newVar);
+                }
+            }
+
+            for (Ir3.Block b : block.outgoing) {
+                for (Ir3.Stmt s : b.statements) {
+                    if (!(s instanceof Ir3.PhiStmt)) break;
+                    Ir3.PhiStmt phiStmt = (Ir3.PhiStmt) s;
+                    doPhi(phiStmt, block, b, method);
+                }
+            }
+
+            method.locals = newLocals;
+        }
+    }
+
+    private void updateReachingDef(Ir3.Var def, Ir3.Block block, Ir3.Method method) {
+        Ir3.Var r = reachingDefMap.get(def);
+        while (!(r == null || method.dominance.dominates(defMap.get(r), block)))
+            r = reachingDefMap.get(r);
+        reachingDefMap.put(def, r);
+    }
+
+    private Ir3.Var doUse(Ir3.Var use, Ir3.Block block, Ir3.Method method) {
+        updateReachingDef(use, block, method);
+        Ir3.Var reach = reachingDefMap.get(use);
+        if (reach == null) {
+            reach = getNewVar(use);
+            newLocals.add(reach);
+            defMap.put(reach, block);
+            reachingDefMap.put(use, reach);
+        }
+        return reach;
+    }
+
+    private void doPhi(Ir3.PhiStmt phiStmt, Ir3.Block incomingB, Ir3.Block phiB, Ir3.Method method) {
+        updateReachingDef(phiStmt.var, incomingB, method);
+        Ir3.Var v = reachingDefMap.get(phiStmt.var);
+        if (v != null) {
+            int index = phiB.incoming.indexOf(incomingB);
+            phiStmt.args.set(index, v);
+        }
+    }
+
+    private Ir3.Var getNewVar(Ir3.Var oldvar) {
+        return new Ir3.Var(oldvar.typ, String.format("%s#%s", oldvar.name, counter++));
     }
 }

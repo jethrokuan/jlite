@@ -163,9 +163,9 @@ public class Ir3 {
         }
     }
 
-    public static class Var extends Rval implements Printable {
-        Ast.Typ typ;
-        String name;
+    public static class Var implements Printable {
+        public Ast.Typ typ;
+        public String name;
 
         public Var(Ast.Typ typ, String name) {
             this.typ = typ;
@@ -179,11 +179,6 @@ public class Ir3 {
             sb.append(name);
             return sb.toString();
         }
-
-        @Override
-        public Ast.Typ getTyp() {
-            return typ;
-        }
     }
 
     public static abstract class Stmt implements Printable {
@@ -193,12 +188,14 @@ public class Ir3 {
 
         public List<Var> getUses() {
             return getRvals().stream()
-                    .filter(rval -> rval instanceof Ir3.Var)
-                    .map(rval -> (Ir3.Var) rval)
+                    .filter(rval -> rval instanceof Ir3.VarRval)
+                    .map(rval -> ((VarRval) rval).var)
                     .collect(Collectors.toList());
         }
 
         public abstract List<Rval> getRvals();
+
+        public abstract void updateDef(Var newVar);
     }
 
     public static class ReadlnStmt extends Stmt {
@@ -227,6 +224,11 @@ public class Ir3 {
         public List<Rval> getRvals() {
             return Collections.emptyList();
         }
+
+        @Override
+        public void updateDef(Var newVar) {
+            var = newVar;
+        }
     }
 
     public static class PrintlnStmt extends Stmt {
@@ -250,6 +252,11 @@ public class Ir3 {
         @Override
         public List<Rval> getRvals() {
             return Arrays.asList(rval);
+        }
+
+        @Override
+        public void updateDef(Var newVar) {
+            System.out.println("Can't update var in println statement");
         }
     }
 
@@ -301,6 +308,11 @@ public class Ir3 {
                 return expr.getRvals();
             }
         }
+
+        @Override
+        public void updateDef(Var newVar) {
+            var = newVar;
+        }
     }
 
     public abstract static class Rval implements Printable {
@@ -340,6 +352,11 @@ public class Ir3 {
             } else {
                 return Arrays.asList(rv);
             }
+        }
+
+        @Override
+        public void updateDef(Var newVar) {
+            System.out.println("Can't update var in return statement");
         }
     }
 
@@ -392,6 +409,11 @@ public class Ir3 {
         public List<Rval> getRvals() {
             return Collections.emptyList();
         }
+
+        @Override
+        public void updateDef(Var newVar) {
+            System.out.println("Can't update var in label statement");
+        }
     }
 
     public static abstract class JumpStmt extends Stmt implements Printable {
@@ -432,6 +454,11 @@ public class Ir3 {
         @Override
         public List<Rval> getRvals() {
             return Collections.emptyList();
+        }
+
+        @Override
+        public void updateDef(Var newVar) {
+            System.out.println("Can't update var in jump statement");
         }
     }
 
@@ -479,6 +506,11 @@ public class Ir3 {
         @Override
         public List<Rval> getRvals() {
             return Arrays.asList(lRv, rRv);
+        }
+
+        @Override
+        public void updateDef(Var newVar) {
+            System.out.println("Can't update var in cmp statement");
         }
     }
 
@@ -592,10 +624,32 @@ public class Ir3 {
         }
     }
 
+    public static class VarRval extends Rval {
+        public Var var;
+
+        public VarRval(Var var) {
+            this.var = var;
+        }
+
+        @Override
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            sb.append(var.print());
+            return sb.toString();
+        }
+
+        @Override
+        public Ast.Typ getTyp() {
+            return var.typ;
+        }
+    }
+
+
     public static class FieldAssignStatement extends Stmt {
-        Var target;
-        String field;
-        Rval v;
+        public Var target;
+        public String field;
+        public Rval v;
 
         public FieldAssignStatement(Var target, String field, Rval v) {
             super();
@@ -620,6 +674,11 @@ public class Ir3 {
         @Override
         public List<Rval> getRvals() {
             return Arrays.asList(v);
+        }
+
+        @Override
+        public void updateDef(Var newVar) {
+            target = newVar;
         }
     }
 
@@ -670,6 +729,11 @@ public class Ir3 {
         public List<Rval> getRvals() {
             return args;
         }
+
+        @Override
+        public void updateDef(Var newVar) {
+            lhs = newVar;
+        }
     }
 
     public static class FieldAccessStatement extends Stmt {
@@ -704,7 +768,12 @@ public class Ir3 {
 
         @Override
         public List<Rval> getRvals() {
-            return Arrays.asList(target);
+            return Arrays.asList(new VarRval(target));
+        }
+
+        @Override
+        public void updateDef(Var newVar) {
+            lhs = newVar;
         }
     }
 
@@ -741,13 +810,18 @@ public class Ir3 {
         public List<Rval> getRvals() {
             return Arrays.asList(rhs);
         }
+
+        @Override
+        public void updateDef(Var newVar) {
+            lhs = newVar;
+        }
     }
 
     public static class Block implements Printable {
         public LabelStmt labelStmt;
         public ArrayList<Ir3.Stmt> statements;
-        public HashSet<Block> outgoing = new HashSet<>();
-        public HashSet<Block> incoming = new HashSet<>();
+        public ArrayList<Block> outgoing = new ArrayList<>();
+        public ArrayList<Block> incoming = new ArrayList<>();
         public int preOrderIndex;
         public int postOrderIndex;
 
@@ -771,11 +845,11 @@ public class Ir3 {
 
     public static class PhiStmt extends Stmt {
         public ArrayList<Var> args;
-        Var v;
+        public Var var;
 
         public PhiStmt(Var v, int size) {
             super();
-            this.v = v;
+            this.var = v;
             this.args = new ArrayList<>();
             for (int i = 0; i < size; i++) {
                 this.args.add(new Var(new Ast.StringTyp(), "UNSET"));
@@ -790,7 +864,7 @@ public class Ir3 {
             for (Var arg : args) {
                 joiner.add(arg.print());
             }
-            sb.append(v.print())
+            sb.append(var.print())
                     .append(" = phi(")
                     .append(joiner.toString())
                     .append(")");
@@ -799,12 +873,17 @@ public class Ir3 {
 
         @Override
         public List<Var> getDefs() {
-            return Arrays.asList(v);
+            return Arrays.asList(var);
         }
 
         @Override
         public List<Rval> getRvals() {
             return Collections.emptyList();
+        }
+
+        @Override
+        public void updateDef(Var newVar) {
+            var = newVar;
         }
     }
 }

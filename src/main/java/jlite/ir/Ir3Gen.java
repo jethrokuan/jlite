@@ -169,7 +169,7 @@ public class Ir3Gen {
                 Ir3.Var temp = tempGenerator.gen(readlnStmt.varDecl.type, method);
                 assert (thisVar != null);
                 statementList.add(new Ir3.ReadlnStmt(temp));
-                statementList.add(new Ir3.FieldAssignStatement(thisVar, field, temp));
+                statementList.add(new Ir3.FieldAssignStatement(thisVar, field, new Ir3.VarRval(temp)));
             } else {
                 System.out.println("readln vardecl unresolved?");
                 assert (false);
@@ -216,7 +216,7 @@ public class Ir3Gen {
 
             statementList.addAll(rhs.statements);
             statementList.addAll(lhs.statements);
-            statementList.add(new Ir3.FieldAssignStatement((Ir3.Var) lhs.rval, fieldAssignStmt.lhsField, rhs.rval));
+            statementList.add(new Ir3.FieldAssignStatement(((Ir3.VarRval) lhs.rval).var, fieldAssignStmt.lhsField, rhs.rval));
             return new StmtChunk(statementList, nextjumps);
         } else if (stmt instanceof Ast.CallStmt) {
             Ast.CallStmt callStmt = (Ast.CallStmt) stmt;
@@ -226,7 +226,7 @@ public class Ir3Gen {
             ArrayList<Ir3.Rval> args = new ArrayList<>();
 
             if (callStmt.target instanceof Ast.IdentExpr) {
-                args.add(thisVar);
+                args.add(new Ir3.VarRval(thisVar));
             } else if (callStmt.target instanceof Ast.DotExpr) {
                 Ast.DotExpr target = (Ast.DotExpr) callStmt.target;
                 RvalChunk rvalChunk = doRval(target.target, method);
@@ -333,16 +333,16 @@ public class Ir3Gen {
             assert identExpr.varDecl != null;
             if (varDeclVarMap.containsKey(identExpr.varDecl)) {
                 Ir3.Var var = varDeclVarMap.get(identExpr.varDecl);
-                return new RvalChunk(var, statementList);
+                return new RvalChunk(new Ir3.VarRval(var), statementList);
             } else if (varDeclFieldMap.containsKey(identExpr.varDecl)) {
                 String field = varDeclFieldMap.get(identExpr.varDecl);
                 Ir3.Var temp = tempGenerator.gen(expr.typ, method);
                 statementList.add(new Ir3.FieldAccessStatement(temp, thisVar, field));
             }
             Ir3.Var v = new Ir3.Var(expr.typ, ((Ast.IdentExpr) expr).ident);
-            return new RvalChunk(v, statementList);
+            return new RvalChunk(new Ir3.VarRval(v), statementList);
         } else if (expr instanceof Ast.ThisExpr) {
-            return new RvalChunk(thisVar, statementList);
+            return new RvalChunk(new Ir3.VarRval(thisVar), statementList);
         } else if (expr instanceof Ast.BinaryExpr) {
             Ast.BinaryExpr binaryExpr = (Ast.BinaryExpr) expr;
             switch (binaryExpr.op) {
@@ -398,7 +398,7 @@ public class Ir3Gen {
                         statementList.add(new Ir3.AssignStmt(v, new Ir3.BoolRval(false)));
                     }
 
-                    return new RvalChunk(v, statementList);
+                    return new RvalChunk(new Ir3.VarRval(v), statementList);
                 }
                 case PLUS:
                 case MINUS:
@@ -415,7 +415,7 @@ public class Ir3Gen {
                     Ir3.Expr3 binaryExpr3 = new Ir3.BinaryExpr(binaryExpr.op, lRes.rval, rRes.rval);
                     statementList.add(new Ir3.AssignStmt(v, binaryExpr3));
 
-                    return new RvalChunk(v, statementList);
+                    return new RvalChunk(new Ir3.VarRval(v), statementList);
                 }
                 default:
                     System.out.println("oops");
@@ -466,13 +466,13 @@ public class Ir3Gen {
                         statementList.add(falseLabel);
                         statementList.add(new Ir3.AssignStmt(temp, new Ir3.BoolRval(false)));
                     }
-                    return new RvalChunk(temp, statementList);
+                    return new RvalChunk(new Ir3.VarRval(temp), statementList);
                 case NEGATIVE:
                     RvalChunk rvalChunk = doRval(unaryExpr.expr, method);
                     Ir3.Var t = tempGenerator.gen(expr.typ, method);
                     statementList.addAll(rvalChunk.statements);
                     statementList.add(new Ir3.UnaryStmt(t, Ast.UnaryOp.NEGATIVE, rvalChunk.rval));
-                    return new RvalChunk(t, statementList);
+                    return new RvalChunk(new Ir3.VarRval(t), statementList);
                 default:
                     System.out.println("oops");
             }
@@ -481,8 +481,8 @@ public class Ir3Gen {
             RvalChunk target = doRval(dotExpr.target, method);
             Ir3.Var temp = tempGenerator.gen(expr.typ, method);
             statementList.addAll(target.statements);
-            statementList.add(new Ir3.FieldAccessStatement(temp, (Ir3.Var) target.rval, dotExpr.ident));
-            return new RvalChunk(temp, statementList);
+            statementList.add(new Ir3.FieldAccessStatement(temp, ((Ir3.VarRval) target.rval).var, dotExpr.ident));
+            return new RvalChunk(new Ir3.VarRval(temp), statementList);
         } else if (expr instanceof Ast.NewExpr) {
             Ast.NewExpr newExpr = (Ast.NewExpr) expr;
             String cname = newExpr.cname;
@@ -490,7 +490,7 @@ public class Ir3Gen {
             Ir3.NewExpr newExpr3 = new Ir3.NewExpr(dataMap.get(cname));
             Ir3.AssignStmt assignStmt = new Ir3.AssignStmt(temp, newExpr3);
             statementList.add(assignStmt);
-            return new RvalChunk(temp, statementList);
+            return new RvalChunk(new Ir3.VarRval(temp), statementList);
         } else if (expr instanceof Ast.CallExpr) {
             Ast.CallExpr callExpr = (Ast.CallExpr) expr;
 
@@ -500,7 +500,7 @@ public class Ir3Gen {
             ArrayList<Ir3.Rval> args = new ArrayList<>();
 
             if (callExpr.target instanceof Ast.IdentExpr) {
-                args.add(thisVar);
+                args.add(new Ir3.VarRval(thisVar));
             } else if (callExpr.target instanceof Ast.DotExpr) {
                 Ast.DotExpr target = (Ast.DotExpr) callExpr.target;
                 RvalChunk rvalChunk = doRval(target.target, method);
@@ -520,7 +520,7 @@ public class Ir3Gen {
             Ir3.Var temp = tempGenerator.gen(expr.typ, method);
             statementList.add(new Ir3.CallStmt(temp, IrMethod, args));
 
-            return new RvalChunk(temp, statementList);
+            return new RvalChunk(new Ir3.VarRval(temp), statementList);
         } else {
             System.out.println("Unhandled expr type: " + expr.getClass().toString());
         }
