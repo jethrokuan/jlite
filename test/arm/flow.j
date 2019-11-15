@@ -6,6 +6,7 @@ class Main {
         } else {
          x = 2;
         }
+        x = x + 1;
         println("Hello World!");
     }
 }

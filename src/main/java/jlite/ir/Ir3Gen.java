@@ -53,6 +53,7 @@ public class Ir3Gen {
                 String name;
                 if (mdDecl.name.equals("main")) {
                     name = mdDecl.name;
+                    ;
                 } else {
                     Integer count = nameCounter.getOrDefault(mdDecl.name, 0);
                     name = "%" + clas.cname + "_" + mdDecl.name + "_" + count;

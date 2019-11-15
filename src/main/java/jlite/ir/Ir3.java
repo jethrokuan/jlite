@@ -101,6 +101,7 @@ public class Ir3 {
         public ArrayList<Block> blockPreOrder;
         public ArrayList<Block> blockPostOrder;
         public DominanceInfo dominance;
+        public ArrayList<Web> webs;
 
         String name;
         Ast.Typ retTyp;
@@ -166,6 +167,7 @@ public class Ir3 {
     public static class Var implements Printable {
         public Ast.Typ typ;
         public String name;
+        public Web web;
 
         public Var(Ast.Typ typ, String name) {
             this.typ = typ;
@@ -885,5 +887,8 @@ public class Ir3 {
         public void updateDef(Var newVar) {
             var = newVar;
         }
+    }
+
+    public static class Web {
     }
 }

@@ -10,5 +10,9 @@ public class PassManager {
         dominancePass.pass(ir3); // Compute Dominance and Dominance Frontiers
         SSAPass ssaPass = new SSAPass();
         ssaPass.pass(ir3);
+        WebPass webPass = new WebPass();
+        webPass.pass(ir3);
+        SpillPass spillPass = new SpillPass(13);
+        spillPass.pass(ir3);
     }
 }
