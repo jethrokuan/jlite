@@ -102,6 +102,7 @@ public class Ir3 {
         public ArrayList<Block> blockPostOrder;
         public DominanceInfo dominance;
         public ArrayList<Web> webs;
+        public LivenessInfo liveness;
 
         String name;
         Ast.Typ retTyp;
@@ -168,6 +169,8 @@ public class Ir3 {
         public Ast.Typ typ;
         public String name;
         public Web web;
+        public boolean spilled = false;
+        public Integer reg = -1;
 
         public Var(Ast.Typ typ, String name) {
             this.typ = typ;
@@ -179,6 +182,11 @@ public class Ir3 {
             StringBuilder sb = new StringBuilder();
             indent(sb, i);
             sb.append(name);
+            if (reg >= 0) {
+                sb.append(" {r")
+                        .append(reg)
+                        .append("}");
+            }
             return sb.toString();
         }
     }
@@ -293,7 +301,7 @@ public class Ir3 {
                 output.append(this.expr.print());
             }
 
-            sb.append(String.format("%s = %s;", var.name, output.toString()));
+            sb.append(String.format("%s = %s;", var.print(), output.toString()));
             return sb.toString();
         }
 
@@ -848,6 +856,7 @@ public class Ir3 {
     public static class PhiStmt extends Stmt {
         public ArrayList<Var> args;
         public Var var;
+        public boolean memory; // whether it resides in memory
 
         public PhiStmt(Var v, int size) {
             super();
@@ -890,5 +899,76 @@ public class Ir3 {
     }
 
     public static class Web {
+    }
+
+    public static class LoadStmt extends Stmt {
+        Var var;
+
+        public LoadStmt(Var toSpill) {
+            super();
+            this.var = toSpill;
+        }
+
+        @Override
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            sb.append(var.print())
+                    .append(" = load MEM_")
+                    .append(var.name)
+                    .append(";");
+            return sb.toString();
+        }
+
+        @Override
+        public List<Rval> getRvals() {
+            return Collections.emptyList();
+        }
+
+        @Override
+        public void updateDef(Var newVar) {
+            this.var = newVar;
+        }
+
+        @Override
+        public List<Var> getDefs() {
+            return Arrays.asList(var);
+        }
+    }
+
+    public static class StoreStmt extends Stmt {
+        Var var;
+
+        public StoreStmt(Var toSpill) {
+            super();
+            this.var = toSpill;
+        }
+
+        @Override
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            sb.append("MEM_")
+                    .append(var.name)
+                    .append(" = store ")
+                    .append(var.print())
+                    .append(";");
+            return sb.toString();
+        }
+
+        @Override
+        public List<Rval> getRvals() {
+            return Collections.emptyList();
+        }
+
+        @Override
+        public void updateDef(Var newVar) {
+            this.var = newVar;
+        }
+
+        @Override
+        public List<Var> getUses() {
+            return Arrays.asList(var);
+        }
     }
 }

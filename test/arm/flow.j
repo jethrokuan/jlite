@@ -1,12 +1,14 @@
 class Main {
     Void main() {
-        Int x;
-        if (x == 1) {
-         x = 1;
-        } else {
-         x = 2;
-        }
-        x = x + 1;
-        println("Hello World!");
+        Int a;
+        Int b;
+        Int c;
+        Int d;
+        Int e;
+        b = 0;
+        c = 0;
+        d = 0;
+        e = 0;
+        a = b + c + d + e;
     }
 }
