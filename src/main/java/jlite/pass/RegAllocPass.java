@@ -11,7 +11,8 @@ import java.util.Stack;
 public class RegAllocPass {
     Ir3.Method method;
     RegisterInterferenceGraph rig;
-    Integer TOTAL_REG_COUNT = 3;
+    Integer TOTAL_REG_COUNT = 12;
+    Integer ARG_REGISTER_COUNT = 4;
 
     public void pass(Ir3.Prog prog) {
         for (Ir3.Method method : prog.methods) {
@@ -24,10 +25,31 @@ public class RegAllocPass {
         LivePass livePass = new LivePass();
         livePass.pass(method);
         rig = new RegisterInterferenceGraph(method);
+        preColor(method);
         Stack<Ir3.Var> processingOrder = rig.getProcessingOrder(TOTAL_REG_COUNT);
+        for (int i = 0; i < ARG_REGISTER_COUNT && i < method.args.size(); i++) {
+            Ir3.Var arg = method.args.get(i);
+            arg.reg = i;
+        }
         while (!processingOrder.empty()) {
             Ir3.Var toColor = processingOrder.pop();
             if (toColor.reg < 0) color(toColor);
+        }
+    }
+
+    private void preColor(Ir3.Method method) {
+        for (Ir3.Block block : method.blocks) {
+            for (Ir3.Stmt stmt : block.statements) {
+                if (!(stmt instanceof Ir3.CallStmt)) continue;
+                Ir3.CallStmt callStmt = (Ir3.CallStmt) stmt;
+                for (int i = 0; i < callStmt.args.size() && i < 4; i++) {
+                    Ir3.Rval arg = callStmt.args.get(i);
+                    assert arg instanceof Ir3.VarRval;
+                    Ir3.VarRval varRval = (Ir3.VarRval) arg;
+                    varRval.var.reg = i;
+                }
+                callStmt.lhs.reg = 0;
+            }
         }
     }
 

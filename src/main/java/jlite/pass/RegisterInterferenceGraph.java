@@ -11,6 +11,14 @@ public class RegisterInterferenceGraph {
     HashMap<Ir3.Var, HashSet<Ir3.Var>> adjList = new HashMap<>();
 
     public RegisterInterferenceGraph(Ir3.Method method) {
+        for (Ir3.Var arg : method.args) {
+            adjList.put(arg, new HashSet<>());
+        }
+
+        for (Ir3.Var local : method.locals) {
+            adjList.put(local, new HashSet<>());
+        }
+
         for (Ir3.Block block : method.blocks) {
             for (Ir3.Stmt stmt : block.statements) {
                 HashSet<Ir3.Var> liveOutInfo = method.liveness.stmtLiveOutMap.get(stmt);

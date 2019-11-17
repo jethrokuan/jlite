@@ -5,6 +5,7 @@ import jlite.ir.Ir3;
 import jlite.ir.Ir3Gen;
 import jlite.parser.Ast;
 import jlite.parser.parser;
+import jlite.pass.ArmGenPass;
 import jlite.pass.PassManager;
 
 import java.util.Arrays;
@@ -29,7 +30,9 @@ public class ArmGen {
     private Arm.Prog gen(Ir3.Prog ir3) {
         PassManager passManager = new PassManager();
         passManager.run(ir3);
-        System.out.print(ir3.print());
-        return new Arm.Prog();
+        ArmGenPass armGenPass = new ArmGenPass();
+        Arm.Prog armProg = armGenPass.pass(ir3);
+        System.out.print(armProg.print());
+        return armProg;
     }
 }

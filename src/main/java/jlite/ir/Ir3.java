@@ -68,8 +68,8 @@ public class Ir3 {
     }
 
     public static class Data implements Printable {
-        String cname;
-        ArrayList<DataField> fields;
+        public String cname;
+        public ArrayList<DataField> fields;
 
         public Data(String cname, ArrayList<DataField> fields) {
             this.cname = cname;
@@ -104,7 +104,7 @@ public class Ir3 {
         public ArrayList<Web> webs;
         public LivenessInfo liveness;
 
-        String name;
+        public String name;
         Ast.Typ retTyp;
 
         public Method(String name, Ast.Typ retTyp) {
@@ -242,7 +242,7 @@ public class Ir3 {
     }
 
     public static class PrintlnStmt extends Stmt {
-        Rval rval;
+        public Rval rval;
 
         public PrintlnStmt(Rval rval) {
             super();
@@ -271,9 +271,9 @@ public class Ir3 {
     }
 
     public static class AssignStmt extends Stmt {
-        Var var;
-        Rval rval;
-        Expr3 expr;
+        public Var var;
+        public Rval rval;
+        public Expr3 expr;
 
         public AssignStmt(Var v, Expr3 expr3) {
             super();
@@ -473,9 +473,9 @@ public class Ir3 {
     }
 
     public static class CmpStmt extends JumpStmt {
-        Ast.BinaryOp op;
-        Rval lRv;
-        Rval rRv;
+        public Ast.BinaryOp op;
+        public Rval lRv;
+        public Rval rRv;
 
         public CmpStmt(Ast.BinaryOp op, Rval lRv, Rval rRv, LabelStmt label) {
             super();
@@ -571,7 +571,7 @@ public class Ir3 {
     }
 
     public static class IntRval extends Rval {
-        Integer i;
+        public Integer i;
 
         public IntRval(Integer i) {
             this.i = i;
@@ -693,9 +693,9 @@ public class Ir3 {
     }
 
     public static class CallStmt extends Stmt {
-        Var lhs;
-        Method method;
-        ArrayList<Rval> args;
+        public Var lhs;
+        public Method method;
+        public ArrayList<Rval> args;
 
         public CallStmt(Var lhs, Method irMethod, ArrayList<Rval> args) {
             this.lhs = lhs;
@@ -747,9 +747,9 @@ public class Ir3 {
     }
 
     public static class FieldAccessStatement extends Stmt {
-        Var lhs;
-        Var target;
-        String field;
+        public Var lhs;
+        public Var target;
+        public String field;
 
         public FieldAccessStatement(Var lhs, Var target, String field) {
             super();
@@ -788,9 +788,9 @@ public class Ir3 {
     }
 
     public static class UnaryStmt extends Stmt {
-        Var lhs;
-        Ast.UnaryOp op;
-        Rval rhs;
+        public Var lhs;
+        public Ast.UnaryOp op;
+        public Rval rhs;
 
         public UnaryStmt(Var lhs, Ast.UnaryOp op, Rval rhs) {
             super();
@@ -937,7 +937,7 @@ public class Ir3 {
     }
 
     public static class StoreStmt extends Stmt {
-        Var var;
+        public Var var;
 
         public StoreStmt(Var toSpill) {
             super();
@@ -969,6 +969,89 @@ public class Ir3 {
         @Override
         public List<Var> getUses() {
             return Arrays.asList(var);
+        }
+    }
+
+    public static class StackArgStmt extends Stmt {
+        public Var var;
+        public int loc;
+
+        public StackArgStmt(Var v, int i) {
+            super();
+            this.var = v;
+            this.loc = i;
+        }
+
+        @Override
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            sb.append("stack(")
+                    .append(var.print())
+                    .append(", ")
+                    .append(loc)
+                    .append(");");
+            return sb.toString();
+        }
+
+        @Override
+        public List<Rval> getRvals() {
+            return Collections.emptyList();
+        }
+
+        @Override
+        public void updateDef(Var newVar) {
+            return;
+        }
+
+        @Override
+        public List<Var> getUses() {
+            return Arrays.asList(var);
+        }
+    }
+
+    public static class PrintfStmt extends Stmt {
+        public ArrayList<Rval> args;
+
+        public PrintfStmt(ArrayList<Rval> args) {
+            super();
+            this.args = args;
+        }
+
+        @Override
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            StringJoiner joiner = new StringJoiner(", ");
+            for (Ir3.Rval arg : args) {
+                joiner.add(arg.print());
+            }
+            sb.append("printf(")
+                    .append(joiner.toString())
+                    .append(");");
+            return sb.toString();
+        }
+
+        @Override
+        public List<Rval> getRvals() {
+            return args;
+        }
+
+        @Override
+        public void updateDef(Var newVar) {
+            return;
+        }
+    }
+
+    public class NullRval extends Rval {
+        @Override
+        public String print(int indent) {
+            return "null";
+        }
+
+        @Override
+        public Ast.Typ getTyp() {
+            return new Ast.NullTyp();
         }
     }
 }
