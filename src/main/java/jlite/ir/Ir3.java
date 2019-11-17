@@ -273,35 +273,19 @@ public class Ir3 {
     public static class AssignStmt extends Stmt {
         public Var var;
         public Rval rval;
-        public Expr3 expr;
-
-        public AssignStmt(Var v, Expr3 expr3) {
-            super();
-            this.var = v;
-            this.expr = expr3;
-            this.rval = null;
-        }
 
         public AssignStmt(Var v, Rval rv) {
             super();
             this.var = v;
             this.rval = rv;
-            this.expr = null;
         }
 
         @Override
         public String print(int i) {
-            assert (this.rval != null || this.expr != null);
+            assert (this.rval != null);
             StringBuilder sb = new StringBuilder();
             indent(sb, i);
-            StringBuilder output = new StringBuilder();
-            if (this.rval != null) {
-                output.append(this.rval.print());
-            } else if (this.expr != null) {
-                output.append(this.expr.print());
-            }
-
-            sb.append(String.format("%s = %s;", var.print(), output.toString()));
+            sb.append(String.format("%s = %s;", var.print(), this.rval.print()));
             return sb.toString();
         }
 
@@ -312,11 +296,7 @@ public class Ir3 {
 
         @Override
         public List<Rval> getRvals() {
-            if (rval != null) {
-                return Arrays.asList(rval);
-            } else {
-                return expr.getRvals();
-            }
+            return Arrays.asList(rval);
         }
 
         @Override
@@ -327,11 +307,6 @@ public class Ir3 {
 
     public abstract static class Rval implements Printable {
         public abstract Ast.Typ getTyp();
-    }
-
-    public abstract static class Expr3 implements Printable {
-
-        public abstract List<Rval> getRvals();
     }
 
     public static class ReturnStmt extends Stmt implements Printable {
@@ -367,36 +342,6 @@ public class Ir3 {
         @Override
         public void updateDef(Var newVar) {
             System.out.println("Can't update var in return statement");
-        }
-    }
-
-    public static class BinaryExpr extends Expr3 implements Printable {
-        public Rval lhs;
-        public Rval rhs;
-        public Ast.BinaryOp op;
-
-        public BinaryExpr(Ast.BinaryOp op, Rval lhs, Rval rhs) {
-            super();
-            this.op = op;
-            this.lhs = lhs;
-            this.rhs = rhs;
-        }
-
-        @Override
-        public String print(int i) {
-            StringBuilder sb = new StringBuilder();
-            indent(sb, i);
-            sb.append(lhs.print())
-                    .append(" ")
-                    .append(op.toString())
-                    .append(" ")
-                    .append(rhs.print());
-            return sb.toString();
-        }
-
-        @Override
-        public List<Rval> getRvals() {
-            return Arrays.asList(lhs, rhs);
         }
     }
 
@@ -546,30 +491,6 @@ public class Ir3 {
         }
     }
 
-    public static class NewExpr extends Expr3 implements Printable {
-        Data data;
-
-        public NewExpr(Data data) {
-            super();
-            this.data = data;
-        }
-
-        @Override
-        public String print(int i) {
-            StringBuilder sb = new StringBuilder();
-            indent(sb, i);
-            sb.append("new ");
-            sb.append(data.cname)
-                    .append("()");
-            return sb.toString();
-        }
-
-        @Override
-        public List<Rval> getRvals() {
-            return Collections.emptyList();
-        }
-    }
-
     public static class IntRval extends Rval {
         public Integer i;
 
@@ -613,7 +534,7 @@ public class Ir3 {
     }
 
     public static class BoolRval extends Rval {
-        boolean b;
+        public boolean b;
 
         public BoolRval(boolean b) {
             this.b = b;
@@ -1052,6 +973,87 @@ public class Ir3 {
         @Override
         public Ast.Typ getTyp() {
             return new Ast.NullTyp();
+        }
+    }
+
+    public static class BinaryStmt extends Stmt {
+        public Var dst;
+        public Rval lhs;
+        public Ast.BinaryOp op;
+        public Rval rhs;
+
+        public BinaryStmt(Var dst, Rval lhs, Ast.BinaryOp op, Rval rhs) {
+            super();
+            this.dst = dst;
+            this.lhs = lhs;
+            this.op = op;
+            this.rhs = rhs;
+        }
+
+        @Override
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            sb.append(dst.print())
+                    .append(" = ")
+                    .append(lhs.print())
+                    .append(" ")
+                    .append(op.toString())
+                    .append(" ")
+                    .append(rhs.print())
+                    .append(";");
+            return sb.toString();
+        }
+
+        @Override
+        public List<Var> getDefs() {
+            return Arrays.asList(dst);
+        }
+
+        @Override
+        public List<Rval> getRvals() {
+            return Arrays.asList(lhs, rhs);
+        }
+
+        @Override
+        public void updateDef(Var newVar) {
+            this.dst = newVar;
+        }
+    }
+
+    public static class NewStmt extends Stmt {
+        Var dst;
+        Data data;
+
+        public NewStmt(Var dst, Data data) {
+            this.dst = dst;
+            this.data = data;
+        }
+
+        @Override
+        public List<Var> getDefs() {
+            return Arrays.asList(dst);
+        }
+
+        @Override
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            sb.append(dst.print())
+                    .append(" = new ")
+                    .append(data.cname)
+                    .append("();");
+            return sb.toString();
+        }
+
+        @Override
+        public List<Rval> getRvals() {
+            return Collections.emptyList();
+        }
+
+        @Override
+        public void updateDef(Var newVar) {
+            this.dst = newVar;
         }
     }
 }

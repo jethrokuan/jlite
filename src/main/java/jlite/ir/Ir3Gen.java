@@ -413,9 +413,8 @@ public class Ir3Gen {
                     Ir3.Var v = tempGenerator.gen(binaryExpr.typ, method);
                     statementList.addAll(lRes.statements);
                     statementList.addAll(rRes.statements);
-                    Ir3.Expr3 binaryExpr3 = new Ir3.BinaryExpr(binaryExpr.op, lRes.rval, rRes.rval);
-                    statementList.add(new Ir3.AssignStmt(v, binaryExpr3));
 
+                    statementList.add(new Ir3.BinaryStmt(v, lRes.rval, binaryExpr.op, rRes.rval));
                     return new RvalChunk(new Ir3.VarRval(v), statementList);
                 }
                 default:
@@ -488,9 +487,8 @@ public class Ir3Gen {
             Ast.NewExpr newExpr = (Ast.NewExpr) expr;
             String cname = newExpr.cname;
             Ir3.Var temp = tempGenerator.gen(newExpr.typ, method);
-            Ir3.NewExpr newExpr3 = new Ir3.NewExpr(dataMap.get(cname));
-            Ir3.AssignStmt assignStmt = new Ir3.AssignStmt(temp, newExpr3);
-            statementList.add(assignStmt);
+            Ir3.NewStmt newStmt = new Ir3.NewStmt(temp, dataMap.get(cname));
+            statementList.add(newStmt);
             return new RvalChunk(new Ir3.VarRval(temp), statementList);
         } else if (expr instanceof Ast.CallExpr) {
             Ast.CallExpr callExpr = (Ast.CallExpr) expr;

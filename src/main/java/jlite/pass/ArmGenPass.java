@@ -3,6 +3,7 @@ package jlite.pass;
 import com.google.common.collect.Lists;
 import jlite.arm.Arm;
 import jlite.ir.Ir3;
+import jlite.parser.Ast;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -127,6 +128,64 @@ public class ArmGenPass {
     }
 
     private void doBlock(Ir3.Block block) {
+        currBlock = new Arm.Block(blockLabelMap.get(block), new ArrayList<>());
+        for (Ir3.Stmt stmt : block.statements) {
+            doStmt(block, stmt);
+        }
+        text.add(currBlock);
+    }
+
+    private void doStmt(Ir3.Block block, Ir3.Stmt stmt) {
+        if (stmt instanceof Ir3.CmpStmt) {
+            Ir3.CmpStmt cmpStmt = (Ir3.CmpStmt) stmt;
+            String targetLabel = blockLabelMap.get(block.outgoing.get(0));
+            String fallthroughLabel = blockLabelMap.get(block.outgoing.get(1));
+
+            Arm.Reg lhs = toReg(cmpStmt.lRv);
+            Arm.Op2 rhs = toOp2(cmpStmt.rRv);
+
+            currBlock.armIsns.add(new Arm.CmpIsn(lhs, rhs));
+            currBlock.armIsns.add(new Arm.BIsn(opToCond(cmpStmt.op), targetLabel));
+            currBlock.armIsns.add(new Arm.BIsn(fallthroughLabel));
+        } else if (stmt instanceof Ir3.GotoStmt) {
+            String target = blockLabelMap.get(block.outgoing.get(0));
+            currBlock.armIsns.add(new Arm.BIsn(target));
+        } else if (stmt instanceof Ir3.BinaryStmt) {
+            // TODO
+        }
+    }
+
+    private Arm.Cond opToCond(Ast.BinaryOp op) {
+        switch (op) {
+            case LT:
+                return Arm.Cond.LT;
+            case GT:
+                return Arm.Cond.GT;
+            case LEQ:
+                return Arm.Cond.LE;
+            case GEQ:
+                return Arm.Cond.GE;
+            case NEQ:
+                return Arm.Cond.NE;
+            case EQ:
+                return Arm.Cond.EQ;
+            default:
+                throw new AssertionError("Invalid cond op: " + op.toString());
+        }
+    }
+
+    private Arm.Op2 toOp2(Ir3.Rval rv) {
+        if (Arm.isConstant(rv)) {
+            return new Arm.Op2Const(rv);
+        } else if (rv instanceof Ir3.VarRval) {
+            return new Arm.Op2Reg(toReg(rv));
+        } else {
+            throw new AssertionError("bad rv " + rv.print());
+        }
+    }
+
+    private Arm.Reg toReg(Ir3.Rval rv) {
+        return toReg(((Ir3.VarRval) rv).var);
     }
 
     private Arm.Reg toReg(Ir3.Var var) {

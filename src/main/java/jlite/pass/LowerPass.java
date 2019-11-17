@@ -116,8 +116,21 @@ public class LowerPass {
         } else if (stmt instanceof Ir3.FieldAccessStatement) {
             newStmts.add(stmt);
             return;
-        } else if (stmt instanceof Ir3.AssignStmt) {
-            Ir3.Expr3 expr = doExpr(((Ir3.AssignStmt) stmt).expr);
+        } else if (stmt instanceof Ir3.BinaryStmt) {
+            Ir3.BinaryStmt binaryStmt = (Ir3.BinaryStmt) stmt;
+
+            if (binaryStmt.op == Ast.BinaryOp.DIV) throw new AssertionError("Division not supported");
+            if (!(binaryStmt.lhs instanceof Ir3.VarRval)) {
+                Ir3.Var temp = tempGenerator.gen(binaryStmt.lhs.getTyp());
+                passStmt(new Ir3.AssignStmt(temp, binaryStmt.lhs));
+                binaryStmt.lhs = new Ir3.VarRval(temp);
+            }
+
+            if (!(binaryStmt.rhs instanceof Ir3.VarRval)) {
+                Ir3.Var temp = tempGenerator.gen(binaryStmt.rhs.getTyp());
+                passStmt(new Ir3.AssignStmt(temp, binaryStmt.rhs));
+                binaryStmt.rhs = new Ir3.VarRval(temp);
+            }
             newStmts.add(stmt);
             return;
         } else if (stmt instanceof Ir3.StackArgStmt) {
@@ -133,25 +146,6 @@ public class LowerPass {
             newStmts.add(stmt);
             return;
         }
-    }
-
-    private Ir3.Expr3 doExpr(Ir3.Expr3 expr) {
-        if (expr instanceof Ir3.BinaryExpr) {
-            Ir3.BinaryExpr binaryExpr = (Ir3.BinaryExpr) expr;
-            if (binaryExpr.op == Ast.BinaryOp.DIV) throw new AssertionError("Division not supported");
-            if (!(binaryExpr.lhs instanceof Ir3.VarRval)) {
-                Ir3.Var temp = tempGenerator.gen(binaryExpr.lhs.getTyp());
-                passStmt(new Ir3.AssignStmt(temp, binaryExpr.lhs));
-                binaryExpr.lhs = new Ir3.VarRval(temp);
-            }
-
-            if (!(binaryExpr.rhs instanceof Ir3.VarRval)) {
-                Ir3.Var temp = tempGenerator.gen(binaryExpr.rhs.getTyp());
-                passStmt(new Ir3.AssignStmt(temp, binaryExpr.rhs));
-                binaryExpr.rhs = new Ir3.VarRval(temp);
-            }
-        }
-        return expr;
     }
 
     private class TempGenerator {

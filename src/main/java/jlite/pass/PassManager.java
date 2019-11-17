@@ -12,6 +12,7 @@ public class PassManager {
         livePass.pass(ir3);
         RegAllocPass regAllocPass = new RegAllocPass();
         regAllocPass.pass(ir3);
+        System.out.print(ir3.print());
 //        DominancePass dominancePass = new DominancePass();
 //        dominancePass.pass(ir3); // Compute Dominance and Dominance Frontiers
 //        SSAPass ssaPass = new SSAPass();

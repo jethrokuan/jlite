@@ -82,6 +82,25 @@ public class Arm {
         }
     }
 
+    public enum Cond implements Printable {
+        EQ("eq"), // Equal
+        NE("ne"), // Not equal
+        GE("ge"), // Greater than or equal, signed
+        LT("lt"), // Less than, signed
+        GT("gt"), // Greater than, signed
+        LE("le"), // Less than or equal, signed
+        AL(""); // Can have any value
+
+        private final String suffix;
+
+        Cond(String suffix) {
+            this.suffix = suffix;
+        }
+
+        public String print(int i) {
+            return suffix;
+        }
+    }
     public interface Printable {
         default String print() {
             return this.print(0);
@@ -172,7 +191,7 @@ public class Arm {
                 joiner.add(reg.print());
             }
             sb.append(joiner.toString())
-                    .append("}");
+                    .append("}\n");
             return sb.toString();
         }
     }
@@ -191,7 +210,7 @@ public class Arm {
 
         @Override
         public String print(int i) {
-            return String.format("\tsub %s, %s, %s", dst.print(), lhs.print(), rhs.print());
+            return String.format("\tsub %s, %s, %s\n", dst.print(), lhs.print(), rhs.print());
         }
     }
 
@@ -204,6 +223,22 @@ public class Arm {
         public Op2Const(int i) {
             super();
             this.i = i;
+        }
+
+        public Op2Const(Ir3.Rval rv) {
+            super();
+            assert Arm.isConstant(rv);
+            if (rv instanceof Ir3.IntRval) {
+                Ir3.IntRval intRval = (Ir3.IntRval) rv;
+                this.i = intRval.i;
+            } else if (rv instanceof Ir3.BoolRval) {
+                Ir3.BoolRval boolRval = (Ir3.BoolRval) rv;
+                this.i = boolRval.b ? 1 : 0;
+            } else if (rv instanceof Ir3.NullRval) {
+                this.i = 0;
+            } else {
+                throw new AssertionError("Invalid rv " + rv.print());
+            }
         }
 
         @Override
@@ -227,15 +262,23 @@ public class Arm {
 
     public static class BIsn extends ArmIsn {
         String label;
+        Cond op;
 
         public BIsn(String label) {
             super();
+            this.label = label;
+            this.op = Cond.AL;
+        }
+
+        public BIsn(Cond op, String label) {
+            super();
+            this.op = op;
             this.label = label;
         }
 
         @Override
         public String print(int i) {
-            return String.format("\tb %s", label);
+            return String.format("\tb%s %s\n", op.print(), label);
         }
     }
 
@@ -253,7 +296,7 @@ public class Arm {
 
         @Override
         public String print(int i) {
-            return String.format("\tadd %s, %s, %s", dst.print(), lhs.print(), rhs.print());
+            return String.format("\tadd %s, %s, %s\n", dst.print(), lhs.print(), rhs.print());
         }
     }
 
@@ -279,7 +322,7 @@ public class Arm {
             }
             sb.append("\t pop {")
                     .append(joiner.toString())
-                    .append("}");
+                    .append("}\n");
             return sb.toString();
         }
     }
@@ -311,6 +354,24 @@ public class Arm {
         @Override
         public String print(int i) {
             return String.format("\tldr %s, =%s\n", reg.print(), i);
+        }
+    }
+
+    public static class CmpIsn extends ArmIsn {
+        Cond cond;
+        Reg lhs;
+        Op2 rhs;
+
+        public CmpIsn(Reg lhs, Op2 rhs) {
+            super();
+            this.cond = Cond.AL;
+            this.lhs = lhs;
+            this.rhs = rhs;
+        }
+
+        @Override
+        public String print(int i) {
+            return String.format("\tcmp%s %s, %s\n", cond.print(), lhs.print(), rhs.print());
         }
     }
 }
