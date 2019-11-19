@@ -2,7 +2,13 @@
 
 To generate ARM instructions, the generator takes in the IR3 AST and performs several passes.
 
-NOTE: This meant that I had to revisit PA2, and fix everything that was there... If you'd consider regrading my PA2 based on this submission...
+> *NOTE*: This meant that I had to revisit PA2, and fix everything that was there... If you'd consider regrading my PA2 based on this submission...
+
+We will be following ARM's Calling Convention, the main rules we state below:
+
+1. Registers R0-R3 are to contain the first four registers (caller's responsibility), and can be expected to be clobbered
+2. Registers R4-R11 are callee-save registers, to be preserved by the function (callee's responsibility).
+3. The stack we use is full-descending (we use instructions `STMFD` and `LDMFD`)
 
 To manage the different passes, I create a `PassManager` at `jlite.pass.PassManager`, similar to how GCC manages their passes.
 
