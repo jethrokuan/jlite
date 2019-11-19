@@ -310,7 +310,7 @@ public class Ir3 {
     }
 
     public static class ReturnStmt extends Stmt implements Printable {
-        Rval rv;
+        public Rval rv;
 
         public ReturnStmt(Rval rv) {
             super();
@@ -513,7 +513,7 @@ public class Ir3 {
     }
 
     public static class StringRval extends Rval {
-        String s;
+        public String s;
 
         public StringRval(String s) {
             this.s = s;
@@ -709,42 +709,42 @@ public class Ir3 {
     }
 
     public static class UnaryStmt extends Stmt {
-        public Var lhs;
+        public Var dst;
         public Ast.UnaryOp op;
-        public Rval rhs;
+        public Rval rv;
 
-        public UnaryStmt(Var lhs, Ast.UnaryOp op, Rval rhs) {
+        public UnaryStmt(Var dst, Ast.UnaryOp op, Rval rv) {
             super();
-            this.lhs = lhs;
+            this.dst = dst;
             this.op = op;
-            this.rhs = rhs;
+            this.rv = rv;
         }
 
         @Override
         public String print(int i) {
             StringBuilder sb = new StringBuilder();
             indent(sb, i);
-            sb.append(lhs.print())
+            sb.append(dst.print())
                     .append(" = ")
                     .append(op)
-                    .append(rhs.print())
+                    .append(rv.print())
                     .append(";");
             return sb.toString();
         }
 
         @Override
         public List<Var> getDefs() {
-            return Arrays.asList(lhs);
+            return Arrays.asList(dst);
         }
 
         @Override
         public List<Rval> getRvals() {
-            return Arrays.asList(rhs);
+            return Arrays.asList(rv);
         }
 
         @Override
         public void updateDef(Var newVar) {
-            lhs = newVar;
+            dst = newVar;
         }
     }
 
@@ -823,7 +823,7 @@ public class Ir3 {
     }
 
     public static class LoadStmt extends Stmt {
-        Var var;
+        public Var var;
 
         public LoadStmt(Var toSpill) {
             super();

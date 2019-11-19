@@ -5,10 +5,7 @@ import jlite.arm.Arm;
 import jlite.ir.Ir3;
 import jlite.parser.Ast;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
+import java.util.*;
 
 public class ArmGenPass {
     private HashMap<String, Integer> fieldOffsets = new HashMap<>();
@@ -21,6 +18,8 @@ public class ArmGenPass {
     private HashMap<Ir3.Var, Integer> stackOffsets = new HashMap<>();
     private LabelGenerator labelGenerator = new LabelGenerator();
     private Arm.Block currBlock;
+    String epilogueLabel;
+    private HashMap<String, String> stringLabelMap = new HashMap<>();
 
     public Arm.Prog pass(Ir3.Prog prog) {
         for (Ir3.Data data : prog.datas) {
@@ -72,9 +71,9 @@ public class ArmGenPass {
                 if (stmt instanceof Ir3.StackArgStmt) {
                     Ir3.StackArgStmt stackArgStmt = (Ir3.StackArgStmt) stmt;
                     requiresStack.add(stackArgStmt.var);
-                } else if (stmt instanceof Ir3.StoreStmt) {
-                    Ir3.StoreStmt storeStmt = (Ir3.StoreStmt) stmt;
-                    requiresStack.add(storeStmt.var);
+                } else if (stmt instanceof Ir3.LoadStmt) {
+                    Ir3.LoadStmt loadStmt = (Ir3.LoadStmt) stmt;
+                    requiresStack.add(loadStmt.var);
                 }
             }
         }
@@ -93,7 +92,7 @@ public class ArmGenPass {
 
         currBlock.armIsns.add(new Arm.SubIsn(Arm.Reg.SP, Arm.Reg.SP, new Arm.Op2Const(stackSize)));
 
-        String epilogueLabel = labelGenerator.gen();
+        epilogueLabel = labelGenerator.gen();
         if (method.blockPostOrder.isEmpty()) {
             currBlock.armIsns.add(new Arm.BIsn(epilogueLabel));
         } else {
@@ -109,8 +108,9 @@ public class ArmGenPass {
         currBlock = epilogueBlock;
         currBlock.armIsns.add(new Arm.AddIsn(Arm.Reg.SP, Arm.Reg.SP, new Arm.Op2Const(stackSize)));
 
+        if (isMain) doAssign(Arm.Reg.R0, 0);
+
         if (calleeRegisters.contains(Arm.Reg.LR)) {
-            if (isMain) doAssign(Arm.Reg.R0, 0);
             calleeRegisters.remove(Arm.Reg.LR);
             calleeRegisters.add(Arm.Reg.PC);
             currBlock.armIsns.add(new Arm.PopIsn(calleeRegisters));
@@ -118,13 +118,38 @@ public class ArmGenPass {
             if (!calleeRegisters.isEmpty()) {
                 currBlock.armIsns.add(new Arm.PopIsn(calleeRegisters));
             }
-            if (isMain) doAssign(Arm.Reg.R0, 0);
             currBlock.armIsns.add(new Arm.BxIsn(Arm.Reg.LR));
         }
+        text.add(epilogueBlock);
     }
 
     private void doAssign(Arm.Reg reg, int i) {
         currBlock.armIsns.add(new Arm.LdrConstIsn(reg, i));
+    }
+
+    private void doAssign(Arm.Reg r1, Arm.Reg r2) {
+        if (r1 != r2) currBlock.armIsns.add(new Arm.MovIsn(r1, new Arm.Op2Reg(r2)));
+    }
+
+    private void doAssign(Arm.Reg reg, Ir3.Rval rv) {
+        if (rv instanceof Ir3.StringRval) {
+            Ir3.StringRval stringRval = (Ir3.StringRval) rv;
+            if (!stringLabelMap.containsKey(stringRval.s)) {
+                String label = labelGenerator.gen();
+                Arm.AscizIsn ascizIsn = new Arm.AscizIsn(stringRval.s);
+                List<Arm.ArmIsn> isns = Arrays.asList(ascizIsn);
+                Arm.Block strBlock = new Arm.Block(label, isns);
+                data.add(strBlock);
+                stringLabelMap.put(stringRval.s, label);
+            }
+            String label = stringLabelMap.get(stringRval.s);
+            currBlock.armIsns.add(new Arm.LdrLabelIsn(reg, label));
+        } else if (rv instanceof Ir3.VarRval) {
+            doAssign(reg, toReg(rv));
+        } else {
+            int i = Arm.toInt(rv);
+            doAssign(reg, i);
+        }
     }
 
     private void doBlock(Ir3.Block block) {
@@ -151,7 +176,71 @@ public class ArmGenPass {
             String target = blockLabelMap.get(block.outgoing.get(0));
             currBlock.armIsns.add(new Arm.BIsn(target));
         } else if (stmt instanceof Ir3.BinaryStmt) {
-            // TODO
+            Ir3.BinaryStmt binaryStmt = (Ir3.BinaryStmt) stmt;
+            Arm.Reg dst = toReg(binaryStmt.dst);
+
+            if (Arm.isConstant(binaryStmt.lhs) && Arm.isConstant(binaryStmt.rhs)) {
+                int lhs = Arm.toInt(binaryStmt.lhs);
+                int rhs = Arm.toInt(binaryStmt.rhs);
+                int res;
+
+                switch (binaryStmt.op) {
+                    case PLUS:
+                        res = lhs + rhs;
+                        break;
+                    case MINUS:
+                        res = lhs - rhs;
+                        break;
+                    case MULT:
+                        res = lhs * rhs;
+                        break;
+                    case DIV:
+                        res = lhs / rhs;
+                        break;
+                    default:
+                        throw new AssertionError("WAT");
+                }
+                doAssign(dst, res);
+            } else if (binaryStmt.op == Ast.BinaryOp.MULT) {
+                // MULT requires both to be reg
+                Arm.Reg lhs = toReg(binaryStmt.lhs);
+                Arm.Reg rhs = toReg(binaryStmt.rhs);
+                currBlock.armIsns.add(new Arm.MulIsn(dst, lhs, rhs));
+            } else if (binaryStmt.op == Ast.BinaryOp.PLUS || binaryStmt.op == Ast.BinaryOp.MINUS) {
+                Arm.Reg lhs = toReg(binaryStmt.lhs);
+                Arm.Op2 rhs = toOp2(binaryStmt.rhs);
+                if (binaryStmt.op == Ast.BinaryOp.PLUS) {
+                    currBlock.armIsns.add(new Arm.AddIsn(dst, lhs, rhs));
+                } else {
+                    currBlock.armIsns.add(new Arm.SubIsn(dst, lhs, rhs));
+                }
+            } else {
+                throw new AssertionError("invalid binarystmt op " + binaryStmt.op);
+            }
+        } else if (stmt instanceof Ir3.UnaryStmt) {
+            Ir3.UnaryStmt unaryStmt = (Ir3.UnaryStmt) stmt;
+            Arm.Reg dst = toReg(unaryStmt.dst);
+
+            if (Arm.isConstant(unaryStmt.rv)) {
+                int v = Arm.toInt(unaryStmt.rv);
+                if (unaryStmt.op != Ast.UnaryOp.NEGATIVE) throw new AssertionError("invalid unary op " + unaryStmt.op);
+                doAssign(dst, -v);
+            } else if (unaryStmt.op == Ast.UnaryOp.NEGATIVE) {
+                Arm.Reg rhs = toReg(unaryStmt.rv);
+                currBlock.armIsns.add(new Arm.RsbIsn(dst, rhs, new Arm.Op2Const(0)));
+            }
+        } else if (stmt instanceof Ir3.AssignStmt) {
+            Arm.Reg lhs = toReg(((Ir3.AssignStmt) stmt).var);
+            doAssign(lhs, ((Ir3.AssignStmt) stmt).rval);
+        } else if (stmt instanceof Ir3.ReturnStmt) {
+            Ir3.ReturnStmt returnStmt = (Ir3.ReturnStmt) stmt;
+            if (returnStmt.rv != null) {
+                doAssign(Arm.Reg.R0, returnStmt.rv);
+            }
+
+            currBlock.armIsns.add(new Arm.BIsn(epilogueLabel));
+        } else {
+            throw new AssertionError("unsupported stmt type " + stmt.getClass().toString());
         }
     }
 

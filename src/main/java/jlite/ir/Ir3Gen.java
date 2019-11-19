@@ -28,7 +28,7 @@ public class Ir3Gen {
                 checker.run(prog);
                 Ir3Gen ir3Gen = new Ir3Gen();
                 Ir3.Prog ir3 = ir3Gen.gen(prog);
-                System.out.println(ir3.print());
+                // System.out.println(ir3.print());
             } catch (Exception e) {
                 e.printStackTrace();
             }

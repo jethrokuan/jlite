@@ -42,7 +42,6 @@ public class SpillPass {
         getDefs(method);
         getNextUse(method);
         initW(method);
-        System.out.println(method.print());
     }
 
     private void initW(Ir3.Method method) {

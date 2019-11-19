@@ -94,14 +94,14 @@ public class LowerPass {
             }
         } else if (stmt instanceof Ir3.UnaryStmt) {
             Ir3.UnaryStmt unaryStmt = (Ir3.UnaryStmt) stmt;
-            if (Arm.isConstant(unaryStmt.rhs)) {
+            if (Arm.isConstant(unaryStmt.rv)) {
                 newStmts.add(stmt);
                 return;
             }
-            if (!(unaryStmt.rhs instanceof Ir3.VarRval)) {
-                Ir3.Var temp = tempGenerator.gen(unaryStmt.rhs.getTyp());
-                passStmt(new Ir3.AssignStmt(temp, unaryStmt.rhs));
-                unaryStmt.rhs = new Ir3.VarRval(temp);
+            if (!(unaryStmt.rv instanceof Ir3.VarRval)) {
+                Ir3.Var temp = tempGenerator.gen(unaryStmt.rv.getTyp());
+                passStmt(new Ir3.AssignStmt(temp, unaryStmt.rv));
+                unaryStmt.rv = new Ir3.VarRval(temp);
             }
             newStmts.add(stmt);
             return;

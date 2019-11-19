@@ -21,6 +21,18 @@ public class Arm {
         }
     }
 
+    public static int toInt(Ir3.Rval rv) {
+        if (rv instanceof Ir3.IntRval) {
+            return ((Ir3.IntRval) rv).i;
+        } else if (rv instanceof Ir3.BoolRval) {
+            return ((Ir3.BoolRval) rv).b ? 1 : 0;
+        } else if (rv instanceof Ir3.NullRval) {
+            return 0;
+        } else {
+            throw new AssertionError("Can't convert rv of type " + rv.getTyp() + " to int.");
+        }
+    }
+
     public static enum Reg implements Printable {
         R0("r0"),
         R1("r1"),
@@ -77,7 +89,8 @@ public class Arm {
             throw new AssertionError("Invalid register number " + x);
         }
 
-        public String print(int i) {
+        @Override
+        public String print() {
             return name;
         }
     }
@@ -97,16 +110,12 @@ public class Arm {
             this.suffix = suffix;
         }
 
-        public String print(int i) {
+        public String print() {
             return suffix;
         }
     }
     public interface Printable {
-        default String print() {
-            return this.print(0);
-        }
-
-        String print(int i);
+        String print();
     }
 
     public static class Prog implements Printable {
@@ -121,20 +130,19 @@ public class Arm {
         }
 
         @Override
-        public String print(int i) {
+        public String print() {
             StringBuilder sb = new StringBuilder();
-            indent(sb, i);
             for (String global : globals) {
                 sb.append("\t.global ").append(global).append("\n");
             }
             sb.append("\n\t.text\n");
             for (Block text : textList) {
-                sb.append(text.print(i));
+                sb.append(text.print());
             }
 
             sb.append("\n\t.data\n");
             for (Block data : dataList) {
-                sb.append(data.print(i));
+                sb.append(data.print());
             }
             return sb.toString();
         }
@@ -143,17 +151,16 @@ public class Arm {
     public static class Block implements Printable {
         public String name;
         public boolean isPrologue;
-        public ArrayList<ArmIsn> armIsns;
+        public List<ArmIsn> armIsns;
 
-        public Block(String name, ArrayList<ArmIsn> armIsns) {
+        public Block(String name, List<ArmIsn> armIsns) {
             this.name = name;
             this.armIsns = armIsns;
         }
 
         @Override
-        public String print(int i) {
+        public String print() {
             StringBuilder sb = new StringBuilder();
-            indent(sb, i);
             if (isPrologue) {
                 sb.append("\n");
             }
@@ -165,7 +172,7 @@ public class Arm {
         }
     }
 
-    private static abstract class ArmIsn implements Printable {
+    public static abstract class ArmIsn implements Printable {
     }
 
     public static class PushIsn extends ArmIsn {
@@ -177,9 +184,8 @@ public class Arm {
         }
 
         @Override
-        public String print(int i) {
+        public String print() {
             StringBuilder sb = new StringBuilder();
-            indent(sb, i);
             ArrayList<Reg> sortedReg = new ArrayList<>();
             for (Reg reg : regs) {
                 sortedReg.add(reg);
@@ -209,7 +215,7 @@ public class Arm {
         }
 
         @Override
-        public String print(int i) {
+        public String print() {
             return String.format("\tsub %s, %s, %s\n", dst.print(), lhs.print(), rhs.print());
         }
     }
@@ -242,7 +248,7 @@ public class Arm {
         }
 
         @Override
-        public String print(int i) {
+        public String print() {
             return "#" + i;
         }
     }
@@ -255,7 +261,7 @@ public class Arm {
         }
 
         @Override
-        public String print(int i) {
+        public String print() {
             return reg.print();
         }
     }
@@ -277,7 +283,7 @@ public class Arm {
         }
 
         @Override
-        public String print(int i) {
+        public String print() {
             return String.format("\tb%s %s\n", op.print(), label);
         }
     }
@@ -295,7 +301,7 @@ public class Arm {
         }
 
         @Override
-        public String print(int i) {
+        public String print() {
             return String.format("\tadd %s, %s, %s\n", dst.print(), lhs.print(), rhs.print());
         }
     }
@@ -309,7 +315,7 @@ public class Arm {
         }
 
         @Override
-        public String print(int i) {
+        public String print() {
             StringBuilder sb = new StringBuilder();
             ArrayList<Reg> sortedRegs = new ArrayList<>();
             for (Reg reg : regs) {
@@ -336,7 +342,7 @@ public class Arm {
         }
 
         @Override
-        public String print(int i) {
+        public String print() {
             return String.format("\tbx %s\n", reg.print());
         }
     }
@@ -352,8 +358,8 @@ public class Arm {
         }
 
         @Override
-        public String print(int i) {
-            return String.format("\tldr %s, =%s\n", reg.print(), i);
+        public String print() {
+            return String.format("\tldr %s, =%s\n", reg.print(), this.i);
         }
     }
 
@@ -370,8 +376,92 @@ public class Arm {
         }
 
         @Override
-        public String print(int i) {
+        public String print() {
             return String.format("\tcmp%s %s, %s\n", cond.print(), lhs.print(), rhs.print());
+        }
+    }
+
+    /**
+     * Like Ascii Isn, but makes string NUL terminated.
+     */
+    public static class AscizIsn extends ArmIsn {
+        public String str;
+
+        public AscizIsn(String s) {
+            this.str = s;
+        }
+
+        @Override
+        public String print() {
+            return String.format("\t.asciz \"%s\"\n", str);
+        }
+    }
+
+    public static class LdrLabelIsn extends ArmIsn {
+        public Reg reg;
+        public String label;
+
+        public LdrLabelIsn(Reg reg, String label) {
+            super();
+            this.reg = reg;
+            this.label = label;
+        }
+
+        @Override
+        public String print() {
+            return String.format("\tldr %s, =%s\n", reg.print(), label);
+        }
+    }
+
+    public static class MovIsn extends ArmIsn {
+        private final Op2 rhs;
+        private final Reg lhs;
+
+        public MovIsn(Reg lhs, Op2 rhs) {
+            super();
+            this.lhs = lhs;
+            this.rhs = rhs;
+        }
+
+        @Override
+        public String print() {
+            return String.format("\tmov %s, %s\n", lhs.print(), rhs.print());
+        }
+    }
+
+    public static class MulIsn extends ArmIsn {
+        public Reg dst;
+        public Reg lhs;
+        public Reg rhs;
+
+        public MulIsn(Reg dst, Reg lhs, Reg rhs) {
+            super();
+            this.dst = dst;
+            this.lhs = lhs;
+            this.rhs = rhs;
+        }
+
+        @Override
+        public String print() {
+            return String.format("\tmul %s, %s, %s\n", dst.print(), lhs.print(), rhs.print());
+        }
+    }
+
+    public static class RsbIsn extends ArmIsn {
+        public Reg dst;
+        public Reg lhs;
+        public Op2 rhs;
+
+        public RsbIsn(Reg dst, Reg lhs, Op2 rhs) {
+            super();
+            this.dst = dst;
+            this.lhs = lhs;
+            this.rhs = rhs;
+        }
+
+        @Override
+        public String print() {
+            return String.format("\trsb %s, %s, %s\n", dst.print(), lhs.print(), rhs.print());
         }
     }
 }
