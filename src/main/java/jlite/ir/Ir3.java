@@ -825,9 +825,9 @@ public class Ir3 {
     public static class LoadStmt extends Stmt {
         public Var var;
 
-        public LoadStmt(Var toSpill) {
+        public LoadStmt(Var var) {
             super();
-            this.var = toSpill;
+            this.var = var;
         }
 
         @Override

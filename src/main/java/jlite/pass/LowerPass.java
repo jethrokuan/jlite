@@ -9,6 +9,7 @@ import java.util.ArrayList;
 public class LowerPass {
     ArrayList<Ir3.Stmt> newStmts = new ArrayList<>();
     private Ir3.Method method;
+    ArrayList<Ir3.Var> stackVars = new ArrayList<>();
     private TempGenerator tempGenerator = new TempGenerator();
 
     public void pass(Ir3.Prog prog) {
@@ -19,6 +20,11 @@ public class LowerPass {
 
     private void pass(Ir3.Method method) {
         this.method = method;
+        stackVars = new ArrayList<>();
+        for (int i = 4; i < method.args.size(); i++) {
+            stackVars.add(method.args.get(i));
+        }
+
         for (Ir3.Block block : method.blocks) {
             newStmts = new ArrayList<>();
             for (Ir3.Stmt stmt : block.statements) {
@@ -29,8 +35,29 @@ public class LowerPass {
     }
 
     private void passStmt(Ir3.Stmt stmt) {
+        for (Ir3.Var use : stmt.getUses()) {
+            if (stackVars.contains(use)) {
+                newStmts.add(new Ir3.LoadStmt(use));
+            }
+        }
+
         if (stmt instanceof Ir3.CallStmt) {
             Ir3.CallStmt callStmt = (Ir3.CallStmt) stmt;
+
+            for (int i = 0; i < callStmt.args.size(); i++) {
+                Ir3.Rval rv = callStmt.args.get(i);
+                if (rv instanceof Ir3.VarRval) continue;
+                Ir3.Var var = tempGenerator.gen(rv.getTyp());
+                passStmt(new Ir3.AssignStmt(var, rv));
+                callStmt.args.set(i, new Ir3.VarRval(var));
+            }
+
+            for (int i = 0; i < callStmt.args.size() && i < 4; i++) {
+                // We are not guaranteed that these R0-R3 are restored, so we store them
+                Ir3.Var var = ((Ir3.VarRval) callStmt.args.get(i)).var;
+                newStmts.add(new Ir3.StoreStmt(var));
+            }
+
             for (int i = callStmt.args.size() - 1; i >= 4; i--) {
                 Ir3.Rval arg = callStmt.args.get(i);
                 Ir3.Var v;
@@ -45,19 +72,18 @@ public class LowerPass {
                 callStmt.args.remove(i);
             }
 
-            for (int i = 0; i < callStmt.args.size(); i++) {
-                Ir3.Rval rv = callStmt.args.get(i);
-                if (rv instanceof Ir3.VarRval) continue;
-                Ir3.Var var = tempGenerator.gen(rv.getTyp());
-                passStmt(new Ir3.AssignStmt(var, rv));
-                callStmt.args.set(i, new Ir3.VarRval(var));
-            }
-
             if (callStmt.lhs == null) {
                 callStmt.lhs = tempGenerator.gen(new Ast.VoidTyp());
             }
 
             newStmts.add(callStmt);
+
+            for (int i = 0; i < callStmt.args.size() && i < 4; i++) {
+                // We are not guaranteed that these R0-R3 are restored, so we restore them
+                Ir3.Var var = ((Ir3.VarRval) callStmt.args.get(i)).var;
+                newStmts.add(new Ir3.LoadStmt(var));
+            }
+
             return;
         } else if (stmt instanceof Ir3.CmpStmt) {
             Ir3.CmpStmt cmpStmt = (Ir3.CmpStmt) stmt;

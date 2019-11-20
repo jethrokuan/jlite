@@ -52,12 +52,15 @@ public class ArmGenPass {
             blockLabelMap.put(block, labelGenerator.gen());
         }
 
+        // Compute what the callee-saved registers are
         calleeRegisters = new HashSet<>();
         for (Ir3.Var var : method.locals) {
             if (var.reg >= 0) {
                 calleeRegisters.add(toReg(var));
             }
         }
+
+        // R0-R3 can be expected to be clobbered
         calleeRegisters.remove(Arm.Reg.R0);
         calleeRegisters.remove(Arm.Reg.R1);
         calleeRegisters.remove(Arm.Reg.R2);
