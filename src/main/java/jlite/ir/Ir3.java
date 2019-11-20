@@ -288,6 +288,15 @@ public class Ir3 {
         }
 
         @Override
+        public List<Var> getUses() {
+            if (rval instanceof Ir3.VarRval) {
+                VarRval varRval = (VarRval) rval;
+                return Arrays.asList(varRval.var);
+            }
+            return Collections.emptyList();
+        }
+
+        @Override
         public String print(int i) {
             StringBuilder sb = new StringBuilder();
             indent(sb, i);

@@ -7,7 +7,7 @@ import jlite.parser.Ast;
 
 import java.util.*;
 
-public class ArmGenPass {
+public class ArmGenPass extends Pass {
     private HashMap<String, HashMap<String, Integer>> fieldOffsets = new HashMap<>();
     private ArrayList<Arm.Block> text = new ArrayList<>();
     private ArrayList<Arm.Block> data = new ArrayList<>();

@@ -8,7 +8,7 @@ import java.util.Stack;
 /**
  * Allocates registers to each var using graph colouring. Depends on liveness information.
  */
-public class RegAllocPass {
+public class RegAllocPass extends Pass {
     Ir3.Method method;
     RegisterInterferenceGraph rig;
     Integer TOTAL_REG_COUNT = 12;
@@ -18,6 +18,7 @@ public class RegAllocPass {
         for (Ir3.Method method : prog.methods) {
             pass(method);
         }
+        PassUtils.write("_pass.regalloc", prog);
     }
 
     private void pass(Ir3.Method method) {

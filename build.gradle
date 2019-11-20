@@ -38,7 +38,7 @@ mainClassName = 'jlite.App'
 
 task ast(type: JavaExec) {
   classpath = sourceSets.main.runtimeClasspath
-  main = "jlite.parser.Ast"
+  main = "jlite.runner.Ast"
 }
 
 task lex(type: JavaExec) {
@@ -48,10 +48,25 @@ task lex(type: JavaExec) {
 
 task tc(type: JavaExec) {
     classpath = sourceSets.main.runtimeClasspath
-    main = "jlite.StaticChecker"
+    main = "jlite.runners.TypeCheck"
 }
 
 task ir3(type: JavaExec) {
     classpath = sourceSets.main.runtimeClasspath
-    main = "jlite.ir.Ir3Gen"
+    main = "jlite.runners.Ir3Gen"
+}
+
+task arm(type: JavaExec) {
+    classpath = sourceSets.main.runtimeClasspath
+    main = "jlite.runners.ArmGen"
+}
+
+task armOpt(type: JavaExec) {
+    classpath = sourceSets.main.runtimeClasspath
+    main = "jlite.runners.ArmGenWithOpt"
+}
+
+task ssa(type: JavaExec) {
+    classpath = sourceSets.main.runtimeClasspath
+    main = "jlite.runners.SSA"
 }

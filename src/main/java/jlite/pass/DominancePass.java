@@ -15,7 +15,7 @@ import java.util.List;
  * Uses data-flow analysis:
  * https://www.cs.rice.edu/~keith/EMBED/dom.pdf
  */
-public class DominancePass {
+public class DominancePass extends Pass {
     HashMap<Ir3.Block, Ir3.Block> idom = new HashMap<>();
     private HashMap<Ir3.Block, ArrayList<Ir3.Block>> idomChildren;
 

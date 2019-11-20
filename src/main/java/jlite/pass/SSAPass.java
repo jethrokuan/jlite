@@ -10,7 +10,7 @@ import java.util.HashSet;
  * http://www.cs.cmu.edu/afs/cs/academic/class/15745-s12/public/lectures/L13-SSA-Concepts-1up.pdf
  * Use Dominance and Dominance Frontiers to Convert to SSA form
  */
-public class SSAPass {
+public class SSAPass extends Pass {
     private ArrayList<Ir3.Var> newLocals = new ArrayList<>();
     private HashMap<Ir3.Var, Ir3.Var> reachingDefMap;
     private HashMap<Ir3.Var, Ir3.Block> defMap;

@@ -22,7 +22,7 @@ import java.util.Set;
  * (c) Perform MIN Algorithm on B
  * 3. Reconstruct SSA
  */
-public class SpillPass {
+public class SpillPass extends Pass {
     private final int TOTAL_REG_COUNT;
     private HashMap<Ir3.Var, Ir3.Block> defLocationMap;
     private HashMap<Ir3.Block, SpillInfo> blockSpillInfoHashMap;

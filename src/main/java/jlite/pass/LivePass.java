@@ -12,7 +12,7 @@ import java.util.List;
  * Computes liveness information at the basic block level. Used for:
  * 1. Register allocation per block
  */
-public class LivePass {
+public class LivePass extends Pass {
     public HashMap<Ir3.Block, HashSet<Ir3.Var>> liveInMap = new HashMap<>();
     public HashMap<Ir3.Block, HashSet<Ir3.Var>> liveOutMap = new HashMap<>();
     public HashMap<Ir3.Stmt, HashSet<Ir3.Var>> stmtLiveInMap = new HashMap<>();

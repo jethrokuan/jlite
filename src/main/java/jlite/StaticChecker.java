@@ -2,7 +2,6 @@ package jlite;
 
 import jlite.exceptions.SemanticException;
 import jlite.parser.Ast;
-import jlite.parser.parser;
 
 import java.util.*;
 
@@ -16,19 +15,6 @@ public class StaticChecker {
         // Proceed with type-checking
         for (Ast.Clas clas : prog.clasList) {
             checkClass(clas);
-        }
-    }
-
-    public static void main(String[] argv) {
-        for (String fileLoc : argv) {
-            try {
-                Ast.Prog prog = parser.parse(fileLoc);
-                StaticChecker checker = new StaticChecker();
-                checker.run(prog);
-                System.out.println(prog.toJSON());
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
         }
     }
 

@@ -7,7 +7,7 @@ import jlite.parser.Ast;
 import java.util.ArrayList;
 import java.util.HashMap;
 
-public class LowerPass {
+public class LowerPass extends Pass {
     ArrayList<Ir3.Stmt> newStmts = new ArrayList<>();
     private Ir3.Method method;
     ArrayList<Ir3.Var> stackVars = new ArrayList<>();

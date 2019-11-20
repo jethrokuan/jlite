@@ -9,7 +9,7 @@ import java.util.HashMap;
  * Construction of Webs for use in SSA-based register allocation
  * Uses UFDS as described in class
  */
-public class WebPass {
+public class WebPass extends Pass {
     private ArrayList<Ir3.Web> webs;
     private HashMap<Ir3.Var, Ir3.Web> varToWebMap;
     private UFDS ufds;

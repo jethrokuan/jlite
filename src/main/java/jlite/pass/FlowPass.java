@@ -12,7 +12,7 @@ import java.util.HashSet;
  * Instructions which are targets of jump or conditional jump are leaders.
  * Instructions which immediately follows jump are considered as leaders
  */
-public class FlowPass {
+public class FlowPass extends Pass {
     private int postOrderIndex = 0;
     private int preOrderIndex = 0;
 
@@ -20,6 +20,8 @@ public class FlowPass {
         for (Ir3.Method method : prog.methods) {
             doMethod(method);
         }
+
+        PassUtils.write("_pass.flowpass", prog);
     }
 
     public void doMethod(Ir3.Method method) {

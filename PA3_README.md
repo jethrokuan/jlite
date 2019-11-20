@@ -1,5 +1,26 @@
 # Programming Assignment 3
+## Usage
+To generate ARM code without optimizations:
 
+```$xslt
+./gradlew arm --args "test/arm/basic.j"
+```
+
+To generate ARM code with optimizations:
+
+```$xslt
+./gradlew armOpt --args "test/arm/basic.j"
+```
+
+To look at the SSA form:
+
+```bash
+./gradlew ssa --args "test/arm/basic.j"
+```
+
+Couldn't get Gem5 working, so couldn't test my ARM output unfortunately.
+
+## Description
 To generate ARM instructions, the generator takes in the IR3 AST and performs several passes.
 
 > *NOTE*: This meant that I had to revisit PA2, and fix everything that was there... If you'd consider regrading my PA2 based on this submission...
@@ -27,10 +48,114 @@ It runs the following passes in order:
     - Nodes are spilled until a 12-coloring of the register interference graph is possible.
 5. `ArmGenPass`: This pass takes the lowered `Ir3` code with registers allocated and generates ARM code.
 
+For passes that modify the IR in a visible way, we print them out to a file called `_pass.$PASSNAME`.
+
 ## Optional: SSA Form
 Initially, the plan was to perform optimizations on `Ir3` code in SSA form. SSA form makes def-use chains explicit, and facilitates some optimizations such as constant propagation, value range propagation and so on. However, deconstructing the SSA required additional care, and I did not have time to do so.
 
 SSA with the minimal number of phi-functions was constructed by first computing dominance (`DominancePass`), via the standard dataflow analysis schema. Dominance Frontiers are computed from the dominance information, which is then used to construct the SSA (see [here](http://www.cs.cmu.edu/afs/cs/academic/class/15745-s12/public/lectures/L13-SSA-Concepts-1up.pdf)).
+
+## Optimizations
+
+### Dead Code Elimination
+In our IR form, the RHS of statements that compute values to be stored are not side-effecting. This means that if the statements compute definitions that are not live after the statement, the statement is safe to remove. This is what we do in this pass:
+
+1. Compute statement liveness info
+2. While has change:
+    - If all of statement defs are not in `liveOut`, remove.
+    - Recompute liveness info
+
+Since there are a finite number of statements, this algorithm terminates.
+
+Consider the code:
+
+```
+class Main {
+    Void main() {
+        Int a;
+        Int b;
+        Int c;
+        Int d;
+        a = 0; // redundant
+        b = 1;
+        c = 2;
+        d = 0; // redundant
+        a = -2; // redundant
+        a = b + c;
+        println(a);
+        return;
+    }
+}
+```
+
+Without optimization:
+```$xslt
+======= CData3 =======
+Data3 Main{
+}
+
+======= CMtd3 =======
+Void main(this){
+  Int _t0;
+  Int _t1;
+  Int _t2;
+  Int _t3;
+  Int a;
+  Int b;
+  Int c;
+  Int d;
+  B0:
+    a = 0;
+    b = 1;
+    c = 2;
+    d = 0;
+    _t0 = -2;
+    a = _t0;
+    _t1 = b + c;
+    a = _t1;
+    _t2 = b * c;
+    a = _t2;
+    _t3 = b - c;
+    a = _t3;
+    println(a);
+    return ;
+}
+
+=====fx== End of IR3 Program =======
+
+```
+
+With Optimization:
+```$xslt
+======= CData3 =======
+Data3 Main{
+}
+
+======= CMtd3 =======
+Void main(this){
+  Int _t0;
+  Int _t1;
+  Int _t2;
+  Int _t3;
+  Int a;
+  Int b;
+  Int c;
+  Int d;
+  B0:
+    b = 1;
+    c = 2;
+    _t3 = b - c;
+    a = _t3;
+    println(a);
+    return ;
+}
+
+=====fx== End of IR3 Program =======
+```
+### TODO
+- Copy Propagation
+- Global Common Subexpressions
+- Peephole Optimizations
 
 ## Improvements
 

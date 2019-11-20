@@ -1,10 +1,11 @@
 package jlite.ir;
 
-import jlite.StaticChecker;
 import jlite.parser.Ast;
-import jlite.parser.parser;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.IdentityHashMap;
+import java.util.List;
 
 public class Ir3Gen {
 
@@ -19,21 +20,6 @@ public class Ir3Gen {
     Ir3.Var thisVar; // used to store the current "this"
     private IdentityHashMap<Ast.VarDecl, Ir3.Var> varDeclVarMap;
     private IdentityHashMap<Ast.VarDecl, String> varDeclFieldMap;
-
-    public static void main(String[] argv) {
-        Arrays.stream(argv).forEach(fileLoc -> {
-            try {
-                Ast.Prog prog = parser.parse(fileLoc);
-                StaticChecker checker = new StaticChecker();
-                checker.run(prog);
-                Ir3Gen ir3Gen = new Ir3Gen();
-                Ir3.Prog ir3 = ir3Gen.gen(prog);
-                // System.out.println(ir3.print());
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        });
-    }
 
     public Ir3.Prog gen(Ast.Prog prog) {
         for (Ast.Clas clas : prog.clasList) {
