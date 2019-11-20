@@ -2,7 +2,9 @@ package jlite.arm;
 
 import jlite.ir.Ir3;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.StringJoiner;
 
 public class Arm {
     public static boolean isConstant(Ir3.Rval rv) {
@@ -176,24 +178,22 @@ public class Arm {
     }
 
     public static class PushIsn extends ArmIsn {
-        Set<Reg> regs;
+        List<Reg> regs;
 
-        public PushIsn(HashSet<Reg> regs) {
+        public PushIsn(List<Reg> regs) {
             super();
-            this.regs = regs;
+            this.regs = new ArrayList<>();
+            for (Arm.Reg reg : regs) {
+                this.regs.add(reg);
+            }
         }
 
         @Override
         public String print() {
             StringBuilder sb = new StringBuilder();
-            ArrayList<Reg> sortedReg = new ArrayList<>();
-            for (Reg reg : regs) {
-                sortedReg.add(reg);
-            }
-            Collections.sort(sortedReg);
-            sb.append("push {");
+            sb.append("\tpush {");
             StringJoiner joiner = new StringJoiner(", ");
-            for (Arm.Reg reg : sortedReg) {
+            for (Arm.Reg reg : regs) {
                 joiner.add(reg.print());
             }
             sb.append(joiner.toString())
@@ -307,26 +307,24 @@ public class Arm {
     }
 
     public static class PopIsn extends ArmIsn {
-        Set<Reg> regs;
+        List<Reg> regs;
 
-        public PopIsn(HashSet<Reg> regs) {
+        public PopIsn(List<Reg> regs) {
             super();
-            this.regs = regs;
+            this.regs = new ArrayList<>();
+            for (Arm.Reg reg : regs) {
+                this.regs.add(reg);
+            }
         }
 
         @Override
         public String print() {
             StringBuilder sb = new StringBuilder();
-            ArrayList<Reg> sortedRegs = new ArrayList<>();
-            for (Reg reg : regs) {
-                sortedRegs.add(reg);
-            }
-            Collections.sort(sortedRegs);
             StringJoiner joiner = new StringJoiner(", ");
-            for (Reg reg : sortedRegs) {
+            for (Reg reg : regs) {
                 joiner.add(reg.print());
             }
-            sb.append("\t pop {")
+            sb.append("\tpop {")
                     .append(joiner.toString())
                     .append("}\n");
             return sb.toString();
@@ -462,6 +460,60 @@ public class Arm {
         @Override
         public String print() {
             return String.format("\trsb %s, %s, %s\n", dst.print(), lhs.print(), rhs.print());
+        }
+    }
+
+    public static class StrIsn extends ArmIsn {
+        public Reg dst;
+        public Reg rhs;
+        public int offset;
+
+        public StrIsn(Reg dst, Reg rhs, int offset) {
+            super();
+            this.dst = dst;
+            this.rhs = rhs;
+            this.offset = offset;
+        }
+
+        @Override
+        public String print() {
+            if (offset == 0) {
+                return String.format("\tstr %s, [%s]\n", dst.print(), rhs.print());
+            } else {
+                return String.format("\tstr %s, [%s, #%s]\n", dst.print(), rhs.print(), offset);
+            }
+        }
+    }
+
+    public static class BlIsn extends ArmIsn {
+        public String label;
+
+        public BlIsn(String label) {
+            super();
+            this.label = label;
+        }
+
+        @Override
+        public String print() {
+            return String.format("\tbl %s\n", label);
+        }
+    }
+
+    public static class LdrIsn extends ArmIsn {
+        public Reg dst;
+        public Reg rhs;
+        public int offset;
+
+        public LdrIsn(Reg dst, Reg rhs, int offset) {
+            super();
+            this.dst = dst;
+            this.rhs = rhs;
+            this.offset = offset;
+        }
+
+        @Override
+        public String print() {
+            return String.format("\tldr %s, [%s, #%s]\n", dst.print(), rhs.print(), offset);
         }
     }
 }

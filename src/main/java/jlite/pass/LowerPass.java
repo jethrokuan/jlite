@@ -5,6 +5,7 @@ import jlite.ir.Ir3;
 import jlite.parser.Ast;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 
 public class LowerPass {
     ArrayList<Ir3.Stmt> newStmts = new ArrayList<>();
@@ -44,6 +45,8 @@ public class LowerPass {
         if (stmt instanceof Ir3.CallStmt) {
             Ir3.CallStmt callStmt = (Ir3.CallStmt) stmt;
 
+            HashMap<Ir3.VarRval, Ir3.Var> argTempMap = new HashMap<>();
+
             for (int i = 0; i < callStmt.args.size(); i++) {
                 Ir3.Rval rv = callStmt.args.get(i);
                 if (rv instanceof Ir3.VarRval) continue;
@@ -54,8 +57,11 @@ public class LowerPass {
 
             for (int i = 0; i < callStmt.args.size() && i < 4; i++) {
                 // We are not guaranteed that these R0-R3 are restored, so we store them
-                Ir3.Var var = ((Ir3.VarRval) callStmt.args.get(i)).var;
-                newStmts.add(new Ir3.StoreStmt(var));
+                Ir3.VarRval arg = (Ir3.VarRval) callStmt.args.get(i);
+                // Generate a new temp to store it locally
+                Ir3.Var temp = tempGenerator.gen(arg.getTyp());
+                argTempMap.put(arg, temp);
+                newStmts.add(new Ir3.AssignStmt(temp, arg));
             }
 
             for (int i = callStmt.args.size() - 1; i >= 4; i--) {
@@ -80,8 +86,10 @@ public class LowerPass {
 
             for (int i = 0; i < callStmt.args.size() && i < 4; i++) {
                 // We are not guaranteed that these R0-R3 are restored, so we restore them
-                Ir3.Var var = ((Ir3.VarRval) callStmt.args.get(i)).var;
-                newStmts.add(new Ir3.LoadStmt(var));
+                Ir3.VarRval arg = (Ir3.VarRval) callStmt.args.get(i);
+                // Generate a new temp to store it locally
+                Ir3.Var temp = argTempMap.get(arg);
+                newStmts.add(new Ir3.AssignStmt(arg.var, new Ir3.VarRval(temp)));
             }
 
             return;
@@ -107,16 +115,25 @@ public class LowerPass {
             newStmts.add(cmpStmt);
         } else if (stmt instanceof Ir3.PrintlnStmt) {
             Ir3.PrintlnStmt printlnStmt = (Ir3.PrintlnStmt) stmt;
+            int numRegs = 1; // str uses R0 only
+            HashMap<Ir3.Var, Ir3.Var> tempsMap = new HashMap<>();
             ArrayList<Ir3.Rval> args = new ArrayList<>();
             if (printlnStmt.rval.getTyp().isSubTypeOrEquals(new Ast.IntTyp())) {
+                numRegs = 2;
                 args.add(new Ir3.StringRval("%i"));
-                args.add(printlnStmt.rval);
-                passStmt(new Ir3.PrintfStmt(args));
-                return;
-            } else {
-                args.add(printlnStmt.rval);
-                passStmt(new Ir3.PrintfStmt(args));
-                return;
+            }
+            args.add(printlnStmt.rval);
+            for (int i = 0; i < method.args.size() - 1 && i < numRegs; i++) {
+                Ir3.Var arg = method.args.get(i);
+                Ir3.Var temp = tempGenerator.gen(arg.typ);
+                tempsMap.put(arg, temp);
+                passStmt(new Ir3.AssignStmt(temp, new Ir3.VarRval(arg)));
+            }
+            newStmts.add(stmt);
+            for (int i = 0; i < method.args.size() - 1 && i < numRegs; i++) {
+                Ir3.Var arg = method.args.get(i);
+                Ir3.Var temp = tempsMap.get(arg);
+                passStmt(new Ir3.AssignStmt(arg, new Ir3.VarRval(temp)));
             }
         } else if (stmt instanceof Ir3.UnaryStmt) {
             Ir3.UnaryStmt unaryStmt = (Ir3.UnaryStmt) stmt;

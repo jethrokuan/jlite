@@ -41,7 +41,7 @@ public class ArmGenPass {
     }
 
     private void passMeth(Ir3.Method method) {
-        Arm.Block prologue = new Arm.Block(getLabel(method), new ArrayList<>());
+        Arm.Block prologue = new Arm.Block(getMethodLabel(method), new ArrayList<>());
         text.add(prologue);
         prologue.isPrologue = true;
         currBlock = prologue;
@@ -89,8 +89,14 @@ public class ArmGenPass {
             stackOffset += 4;
         }
 
+        ArrayList<Arm.Reg> crList = new ArrayList<>();
+        for (Arm.Reg reg : calleeRegisters) {
+            crList.add(reg);
+        }
+        Collections.sort(crList);
+        crList.add(Arm.Reg.LR);
         if (!calleeRegisters.isEmpty()) {
-            currBlock.armIsns.add(new Arm.PushIsn(calleeRegisters));
+            currBlock.armIsns.add(new Arm.PushIsn(crList));
         }
 
         currBlock.armIsns.add(new Arm.SubIsn(Arm.Reg.SP, Arm.Reg.SP, new Arm.Op2Const(stackSize)));
@@ -113,16 +119,10 @@ public class ArmGenPass {
 
         if (isMain) doAssign(Arm.Reg.R0, 0);
 
-        if (calleeRegisters.contains(Arm.Reg.LR)) {
-            calleeRegisters.remove(Arm.Reg.LR);
-            calleeRegisters.add(Arm.Reg.PC);
-            currBlock.armIsns.add(new Arm.PopIsn(calleeRegisters));
-        } else {
-            if (!calleeRegisters.isEmpty()) {
-                currBlock.armIsns.add(new Arm.PopIsn(calleeRegisters));
-            }
-            currBlock.armIsns.add(new Arm.BxIsn(Arm.Reg.LR));
-        }
+        crList.remove(Arm.Reg.LR);
+        crList.add(Arm.Reg.PC);
+        currBlock.armIsns.add(new Arm.PopIsn(crList));
+
         text.add(epilogueBlock);
     }
 
@@ -242,6 +242,31 @@ public class ArmGenPass {
             }
 
             currBlock.armIsns.add(new Arm.BIsn(epilogueLabel));
+        } else if (stmt instanceof Ir3.StackArgStmt) {
+            Ir3.StackArgStmt stackArgStmt = (Ir3.StackArgStmt) stmt;
+            Arm.Reg src = toReg(stackArgStmt.var);
+            int stackOffset = stackOffsets.get(stackArgStmt.var);
+            currBlock.armIsns.add(new Arm.StrIsn(src, Arm.Reg.SP, stackOffset));
+        } else if (stmt instanceof Ir3.CallStmt) {
+            Ir3.CallStmt callStmt = (Ir3.CallStmt) stmt;
+            currBlock.armIsns.add(new Arm.BlIsn(getMethodLabel(callStmt.method)));
+            ;
+        } else if (stmt instanceof Ir3.LoadStmt) {
+            Ir3.LoadStmt loadStmt = (Ir3.LoadStmt) stmt;
+            Arm.Reg dst = toReg(loadStmt.var);
+            int stackOffset = stackOffsets.get(loadStmt.var);
+            currBlock.armIsns.add(new Arm.LdrIsn(dst, Arm.Reg.SP, stackOffset));
+        } else if (stmt instanceof Ir3.PrintlnStmt) {
+            Ir3.PrintlnStmt printlnStmt = (Ir3.PrintlnStmt) stmt;
+            globals.add("printf");
+            if (printlnStmt.rval.getTyp().isSubTypeOrEquals(new Ast.IntTyp())) { //int
+                doAssign(Arm.Reg.R0, new Ir3.StringRval("%i"));
+                doAssign(Arm.Reg.R1, printlnStmt.rval);
+            } else {
+                doAssign(Arm.Reg.R0, printlnStmt.rval);
+            }
+            currBlock.armIsns.add(new Arm.BlIsn("printf(PLT)"));
+
         } else {
             throw new AssertionError("unsupported stmt type " + stmt.getClass().toString());
         }
@@ -285,7 +310,7 @@ public class ArmGenPass {
         return Arm.Reg.fromInt(var.reg);
     }
 
-    private String getLabel(Ir3.Method method) {
+    private String getMethodLabel(Ir3.Method method) {
         if (method.name == "main") return method.name;
         return "." + method.name.replace("%", "__");
     }

@@ -931,6 +931,11 @@ public class Ir3 {
         }
     }
 
+    enum PrintfType {
+        INT,
+        STRING
+    }
+
     public static class PrintfStmt extends Stmt {
         public ArrayList<Rval> args;
 
