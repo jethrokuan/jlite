@@ -8,10 +8,10 @@ import jlite.parser.Ast;
 import java.util.*;
 
 public class ArmGenPass {
-    private HashMap<String, Integer> fieldOffsets = new HashMap<>();
+    private HashMap<String, HashMap<String, Integer>> fieldOffsets = new HashMap<>();
     private ArrayList<Arm.Block> text = new ArrayList<>();
     private ArrayList<Arm.Block> data = new ArrayList<>();
-    private ArrayList<String> globals = new ArrayList<>();
+    private HashSet<String> globals = new HashSet<>();
     private HashMap<Ir3.Block, String> blockLabelMap;
     private HashSet<Arm.Reg> calleeRegisters;
     private boolean isMain;
@@ -29,7 +29,7 @@ public class ArmGenPass {
                 offsets.put(data.cname, offset);
                 offset += 4;
             }
-            fieldOffsets = offsets;
+            fieldOffsets.put(data.cname, offsets);
         }
         globals.add("main");
 
@@ -37,7 +37,7 @@ public class ArmGenPass {
             passMeth(method);
         }
 
-        return new Arm.Prog(text, data, globals);
+        return new Arm.Prog(text, data, new ArrayList<>(globals));
     }
 
     private void passMeth(Ir3.Method method) {
@@ -266,7 +266,24 @@ public class ArmGenPass {
                 doAssign(Arm.Reg.R0, printlnStmt.rval);
             }
             currBlock.armIsns.add(new Arm.BlIsn("printf(PLT)"));
+        } else if (stmt instanceof Ir3.FieldAccessStatement) {
+            Ir3.FieldAccessStatement fieldAccessStatement = (Ir3.FieldAccessStatement) stmt;
+            Arm.Reg dst = toReg(fieldAccessStatement.dst);
+            Arm.Reg target = toReg(fieldAccessStatement.target);
+            int fieldOffset = fieldOffsets.get(((Ast.ClasTyp) fieldAccessStatement.dst.typ).cname).get(fieldAccessStatement.field);
+            currBlock.armIsns.add(new Arm.LdrIsn(dst, target, fieldOffset));
+        } else if (stmt instanceof Ir3.FieldAssignStatement) {
+            Ir3.FieldAssignStatement fieldAssignStatement = (Ir3.FieldAssignStatement) stmt;
+            Arm.Reg src = toReg(fieldAssignStatement.v);
+            Arm.Reg dst = toReg(fieldAssignStatement.target);
+            int fieldOffset = fieldOffsets.get(((Ast.ClasTyp) fieldAssignStatement.target.typ).cname).get(fieldAssignStatement.field);
 
+            currBlock.armIsns.add(new Arm.LdrIsn(dst, src, fieldOffset));
+        } else if (stmt instanceof Ir3.AllocStmt) { // clobbers R0
+            Ir3.AllocStmt allocStmt = (Ir3.AllocStmt) stmt;
+            doAssign(Arm.Reg.R0, allocStmt.size);
+            currBlock.armIsns.add(new Arm.BlIsn("_Znwj(PLT)"));
+            doAssign(toReg(allocStmt.dst), Arm.Reg.R0);
         } else {
             throw new AssertionError("unsupported stmt type " + stmt.getClass().toString());
         }

@@ -31,3 +31,10 @@ It runs the following passes in order:
 Initially, the plan was to perform optimizations on `Ir3` code in SSA form. SSA form makes def-use chains explicit, and facilitates some optimizations such as constant propagation, value range propagation and so on. However, deconstructing the SSA required additional care, and I did not have time to do so.
 
 SSA with the minimal number of phi-functions was constructed by first computing dominance (`DominancePass`), via the standard dataflow analysis schema. Dominance Frontiers are computed from the dominance information, which is then used to construct the SSA (see [here](http://www.cs.cmu.edu/afs/cs/academic/class/15745-s12/public/lectures/L13-SSA-Concepts-1up.pdf)).
+
+## Improvements
+
+1. Right now register allocation uses the var name as nodes in the register interference graph. A web can instead be used to reduce the potential number of spills. We have this coded out in `WebPass`.
+2. As a solution of restoring R0-R3 on function calls, temporaries are created to save all R0-R3 before the function call, and then restored after the function call. Several improvements can be made here:
+    1. There is no need to save all R0-R3 if they are not live after the call. This can be determined with liveness analysis.
+3. The SSA Pass was created but not used.

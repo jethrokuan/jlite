@@ -95,11 +95,11 @@ public class LowerPass {
             return;
         } else if (stmt instanceof Ir3.CmpStmt) {
             Ir3.CmpStmt cmpStmt = (Ir3.CmpStmt) stmt;
-
-            if (Arm.isConstant(cmpStmt.lRv) && Arm.isConstant(cmpStmt.rRv)) {
-                newStmts.add(cmpStmt);
-                return;
-            }
+//
+//            if (Arm.isConstant(cmpStmt.lRv) && Arm.isConstant(cmpStmt.rRv)) {
+//                newStmts.add(cmpStmt);
+//                return;
+//            }
 
             if (!(cmpStmt.lRv instanceof Ir3.VarRval)) {
                 Ir3.Var temp = tempGenerator.gen(cmpStmt.lRv.getTyp());
@@ -185,6 +185,24 @@ public class LowerPass {
         } else if (stmt instanceof Ir3.PrintfStmt) {
             newStmts.add(stmt);
             return;
+        } else if (stmt instanceof Ir3.NewStmt) {
+            // Heap allocation uses R0, save first arg if any
+            int numRegs = 1;
+            HashMap<Ir3.Var, Ir3.Var> tempsMap = new HashMap<>();
+            Ir3.NewStmt newStmt = (Ir3.NewStmt) stmt;
+            for (int i = 0; i < method.args.size() - 1 && i < numRegs; i++) {
+                Ir3.Var arg = method.args.get(i);
+                Ir3.Var temp = tempGenerator.gen(arg.typ);
+                tempsMap.put(arg, temp);
+                passStmt(new Ir3.AssignStmt(temp, new Ir3.VarRval(arg)));
+            }
+            int memSize = newStmt.data.fields.size() * 4;
+            newStmts.add(new Ir3.AllocStmt(newStmt.dst, memSize));
+            for (int i = 0; i < method.args.size() - 1 && i < numRegs; i++) {
+                Ir3.Var arg = method.args.get(i);
+                Ir3.Var temp = tempsMap.get(arg);
+                passStmt(new Ir3.AssignStmt(arg, new Ir3.VarRval(temp)));
+            }
         } else {
             newStmts.add(stmt);
             return;

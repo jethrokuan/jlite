@@ -208,6 +208,44 @@ public class Ir3 {
         public abstract void updateDef(Var newVar);
     }
 
+    public static class AllocStmt extends Stmt {
+        public int size;
+        public Var dst;
+
+        public AllocStmt(Var dst, int size) {
+            super();
+            this.dst = dst;
+            this.size = size;
+        }
+
+        @Override
+        public String print(int i) {
+            StringBuilder sb = new StringBuilder();
+            indent(sb, i);
+            sb.append(dst.print())
+                    .append(" = ");
+            sb.append("alloc(")
+                    .append(size)
+                    .append(")");
+            return sb.toString();
+        }
+
+        @Override
+        public List<Var> getDefs() {
+            return Arrays.asList(dst);
+        }
+
+        @Override
+        public List<Rval> getRvals() {
+            return Collections.emptyList();
+        }
+
+        @Override
+        public void updateDef(Var newVar) {
+            dst = newVar;
+        }
+    }
+
     public static class ReadlnStmt extends Stmt {
         Var var;
 
@@ -668,13 +706,13 @@ public class Ir3 {
     }
 
     public static class FieldAccessStatement extends Stmt {
-        public Var lhs;
+        public Var dst;
         public Var target;
         public String field;
 
-        public FieldAccessStatement(Var lhs, Var target, String field) {
+        public FieldAccessStatement(Var dst, Var target, String field) {
             super();
-            this.lhs = lhs;
+            this.dst = dst;
             this.target = target;
             this.field = field;
         }
@@ -683,7 +721,7 @@ public class Ir3 {
         public String print(int i) {
             StringBuilder sb = new StringBuilder();
             indent(sb, i);
-            sb.append(lhs.print())
+            sb.append(dst.print())
                     .append(" = ")
                     .append(target.print())
                     .append(".")
@@ -694,7 +732,7 @@ public class Ir3 {
 
         @Override
         public List<Var> getDefs() {
-            return Arrays.asList(lhs);
+            return Arrays.asList(dst);
         }
 
         @Override
@@ -704,7 +742,7 @@ public class Ir3 {
 
         @Override
         public void updateDef(Var newVar) {
-            lhs = newVar;
+            dst = newVar;
         }
     }
 
@@ -1027,8 +1065,8 @@ public class Ir3 {
     }
 
     public static class NewStmt extends Stmt {
-        Var dst;
-        Data data;
+        public Var dst;
+        public Data data;
 
         public NewStmt(Var dst, Data data) {
             this.dst = dst;
