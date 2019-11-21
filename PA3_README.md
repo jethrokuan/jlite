@@ -20,6 +20,8 @@ To look at the SSA form:
 
 Couldn't get Gem5 working, so couldn't test my ARM output unfortunately.
 
+Random test cases are in test/arm.
+
 ## Description
 To generate ARM instructions, the generator takes in the IR3 AST and performs several passes.
 
@@ -49,12 +51,21 @@ It runs the following passes in order:
 5. `ArmGenPass`: This pass takes the lowered `Ir3` code with registers allocated and generates ARM code.
 
 For passes that modify the IR in a visible way, we print them out to a file called `_pass.$PASSNAME`.
+
 ## Arm Stack and Heap Management
 
 The frame pointer is not used. Each stack frame looks like this:
 
+```
+callee-saved reg (cr.size() - 4)
+locals (from spills, loads)
+arg_n
+...
+arg_4
+(top of stack)
+```
 
-
+Heap allocation is necessary upon instantiation of a new class. It is allocated with the `_Znwj(PLT)` ARM instruction, and the address is stored in the variable. The amount of memory allocated is computed from the fields in the class, and offset from the class field order.
 
 
 ## Optional: SSA Form
