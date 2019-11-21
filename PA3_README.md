@@ -49,6 +49,13 @@ It runs the following passes in order:
 5. `ArmGenPass`: This pass takes the lowered `Ir3` code with registers allocated and generates ARM code.
 
 For passes that modify the IR in a visible way, we print them out to a file called `_pass.$PASSNAME`.
+## Arm Stack and Heap Management
+
+The frame pointer is not used. Each stack frame looks like this:
+
+
+
+
 
 ## Optional: SSA Form
 Initially, the plan was to perform optimizations on `Ir3` code in SSA form. SSA form makes def-use chains explicit, and facilitates some optimizations such as constant propagation, value range propagation and so on. However, deconstructing the SSA required additional care, and I did not have time to do so.

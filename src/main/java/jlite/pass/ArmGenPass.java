@@ -69,37 +69,64 @@ public class ArmGenPass extends Pass {
         // Allocate stack
         HashSet<Ir3.Var> requiresStack = new HashSet<>();
 
+        // Arguments are stored onto the stack by the caller.
+        // Different function calls will have different number of arguments, but the stack space required is shared.
+        int maxArg = -1;
+
         for (Ir3.Block block : method.blocks) {
             for (Ir3.Stmt stmt : block.statements) {
                 if (stmt instanceof Ir3.StackArgStmt) {
                     Ir3.StackArgStmt stackArgStmt = (Ir3.StackArgStmt) stmt;
-                    requiresStack.add(stackArgStmt.var);
+                    maxArg = Math.max(maxArg, stackArgStmt.loc);
                 } else if (stmt instanceof Ir3.LoadStmt) {
                     Ir3.LoadStmt loadStmt = (Ir3.LoadStmt) stmt;
                     requiresStack.add(loadStmt.var);
+                } else if (stmt instanceof Ir3.StoreStmt) {
+                    Ir3.StoreStmt storeStmt = (Ir3.StoreStmt) stmt;
+                    requiresStack.add(storeStmt.var);
                 }
             }
         }
 
-        int stackSize = requiresStack.size() * 4;
-        int stackOffset = 0;
-        stackOffsets = new HashMap<>();
-        for (Ir3.Var var : requiresStack) {
-            stackOffsets.put(var, stackOffset);
-            stackOffset += 4;
-        }
-
-        ArrayList<Arm.Reg> crList = new ArrayList<>();
-        for (Arm.Reg reg : calleeRegisters) {
-            crList.add(reg);
-        }
+        ArrayList<Arm.Reg> crList = new ArrayList<>(calleeRegisters);
         Collections.sort(crList);
         crList.add(Arm.Reg.LR);
         if (!calleeRegisters.isEmpty()) {
             currBlock.armIsns.add(new Arm.PushIsn(crList));
         }
 
-        currBlock.armIsns.add(new Arm.SubIsn(Arm.Reg.SP, Arm.Reg.SP, new Arm.Op2Const(stackSize)));
+        int stackNum = (maxArg + 1) + requiresStack.size() + calleeRegisters.size();
+        if (stackNum % 2 == 1) stackNum++; // byte alignment
+
+        int stackAlloc = (stackNum - calleeRegisters.size()) * 4; //calleeReg stack space allocated by push isn
+        int stackOffset = (maxArg + 1) * 4; // top of stack reserved for function calls
+        stackOffsets = new HashMap<>();
+        for (Ir3.Var var : requiresStack) {
+            stackOffsets.put(var, stackOffset);
+            stackOffset += 4;
+        }
+
+        for (int i = 4; i < method.args.size(); i++) {
+            Ir3.Var arg = method.args.get(i);
+            stackOffsets.put(arg, (stackNum + i - 4) * 4);
+        }
+
+        if (stackAlloc != 0)
+            currBlock.armIsns.add(new Arm.SubIsn(Arm.Reg.SP, Arm.Reg.SP, new Arm.Op2Const(stackAlloc)));
+
+        /**
+         * Stack looks like this
+         *
+         * --
+         * callee-saved reg (cr.size() - 4)
+         * --
+         * locals (from spills, loads)
+         * --
+         * arg_n
+         * ...
+         * arg_4
+         * --- (top of stack)
+         */
 
         epilogueLabel = labelGenerator.gen();
         if (method.blockPostOrder.isEmpty()) {
@@ -115,7 +142,8 @@ public class ArmGenPass extends Pass {
 
         Arm.Block epilogueBlock = new Arm.Block(epilogueLabel, new ArrayList<>());
         currBlock = epilogueBlock;
-        currBlock.armIsns.add(new Arm.AddIsn(Arm.Reg.SP, Arm.Reg.SP, new Arm.Op2Const(stackSize)));
+        if (stackAlloc != 0)
+            currBlock.armIsns.add(new Arm.AddIsn(Arm.Reg.SP, Arm.Reg.SP, new Arm.Op2Const(stackAlloc)));
 
         if (isMain) doAssign(Arm.Reg.R0, 0);
 
@@ -245,7 +273,7 @@ public class ArmGenPass extends Pass {
         } else if (stmt instanceof Ir3.StackArgStmt) {
             Ir3.StackArgStmt stackArgStmt = (Ir3.StackArgStmt) stmt;
             Arm.Reg src = toReg(stackArgStmt.var);
-            int stackOffset = stackOffsets.get(stackArgStmt.var);
+            int stackOffset = stackArgStmt.loc * 4; // Caller placed it at stackOffset from top of stack
             currBlock.armIsns.add(new Arm.StrIsn(src, Arm.Reg.SP, stackOffset));
         } else if (stmt instanceof Ir3.CallStmt) {
             Ir3.CallStmt callStmt = (Ir3.CallStmt) stmt;
